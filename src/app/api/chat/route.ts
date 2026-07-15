@@ -67,7 +67,8 @@ export async function POST(req: Request) {
             plant_id: z.string().optional().describe('ID (UUID) exacto de la planta, extráelo del contexto'),
             product_id: z.string().optional().describe('ID (UUID) exacto del producto, extráelo del contexto'),
           }),
-          execute: async ({ type, date, notes, plant_id, product_id }) => {
+          execute: async (args) => {
+            const { type, date, notes, plant_id, product_id } = args;
             if (!user) return 'No autenticado';
             const { error } = await supabase.from('events').insert({
               user_id: user.id, type, date, notes: notes || null, plant_id: plant_id || null, product_id: product_id || null
@@ -82,7 +83,8 @@ export async function POST(req: Request) {
             type: z.string().describe('Tipo (Fungicida, Abono, Insecticida, Otro)'),
             description: z.string().optional().describe('Descripción o notas'),
           }),
-          execute: async ({ name, type, description }) => {
+          execute: async (args) => {
+            const { name, type, description } = args;
             if (!user) return 'No autenticado';
             const { error } = await supabase.from('products').insert({
               user_id: user.id, name, type, description: description || null
@@ -97,7 +99,8 @@ export async function POST(req: Request) {
             species: z.string().optional().describe('Especie o variedad'),
             description: z.string().optional().describe('Descripción breve'),
           }),
-          execute: async ({ name, species, description }) => {
+          execute: async (args) => {
+            const { name, species, description } = args;
             if (!user) return 'No autenticado';
             const { error } = await supabase.from('plants').insert({
               user_id: user.id, name, species: species || null, description: description || null
