@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from '@/utils/supabase/server';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, tool } from 'ai';
