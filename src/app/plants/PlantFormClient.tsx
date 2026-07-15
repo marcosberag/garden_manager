@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { addPlant, updatePlant } from '@/app/actions';
 import AutocompleteInput from '@/components/AutocompleteInput';
 
@@ -18,6 +19,7 @@ interface PlantData {
 }
 
 export default function PlantFormClient({ initialData, isEdit = false }: { initialData?: PlantData, isEdit?: boolean }) {
+  const router = useRouter();
   const [speciesValue, setSpeciesValue] = useState(initialData?.species || '');
 
   const handleIdentified = (species: string) => {

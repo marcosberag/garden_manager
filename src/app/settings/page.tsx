@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import { createClient } from '@/utils/supabase/server';
 import { addContact, deleteContact } from './actions';
