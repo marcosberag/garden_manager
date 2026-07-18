@@ -266,7 +266,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                       </button>
                     </div>
                   )}
-                  {item.isPast && item.id && (
+                  {item.id && (
                     <a href={`/calendar/${item.id}/edit`} style={{ fontSize: '10px', color: '#3498DB', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', border: '1px solid #3498DB', borderRadius: '4px', textAlign: 'center' }}>
                       EDITAR
                     </a>
