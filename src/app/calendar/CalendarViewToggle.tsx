@@ -146,9 +146,9 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
         reason: e.notes || (e.date <= todayStr ? 'Tratamiento completado y registrado.' : 'Tarea pendiente de realizar.'),
         date: e.date,
         urgency: e.date <= todayStr ? (e.date < todayStr ? 'alta' : 'media') : 'baja',
-        isPast: e.date <= todayStr && !e.notes?.includes('[PROGRAMADO]'),
-        isScheduled: e.date > todayStr && !e.notes?.includes('[PROGRAMADO]'),
-        isSuggestion: e.notes?.includes('[PROGRAMADO]')
+        isPast: e.notes?.includes('[HECHO]') || (e.date < todayStr && !e.notes?.includes('[PROGRAMADO]')),
+        isScheduled: e.date > todayStr && !e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'),
+        isSuggestion: e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')
       }))
     ];
 
@@ -239,18 +239,32 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                 
                 <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {!item.isPast && item.id && (item.isSuggestion || item.urgency === 'alta' || item.urgency === 'media') && (
-                    <button 
-                      onClick={() => {
-                        startTransition(async () => {
-                          const { postponeEvent } = await import('@/app/actions');
-                          await postponeEvent(item.id);
-                        });
-                      }}
-                      style={{ fontSize: '9px', color: '#E67E22', backgroundColor: '#FEF5E7', border: '1px solid #F39C12', textDecoration: 'none', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
-                      disabled={isPending}
-                    >
-                      +1 POSPONER
-                    </button>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <button 
+                        onClick={() => {
+                          startTransition(async () => {
+                            const { postponeEvent } = await import('@/app/actions');
+                            await postponeEvent(item.id);
+                          });
+                        }}
+                        style={{ fontSize: '9px', color: '#E67E22', backgroundColor: '#FEF5E7', border: '1px solid #F39C12', textDecoration: 'none', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
+                        disabled={isPending}
+                      >
+                        +1 POSPONER
+                      </button>
+                      <button 
+                        onClick={() => {
+                          startTransition(async () => {
+                            const { completeEvent } = await import('@/app/actions');
+                            await completeEvent(item.id);
+                          });
+                        }}
+                        style={{ fontSize: '9px', color: '#27AE60', backgroundColor: '#EAFAF1', border: '1px solid #2ECC71', textDecoration: 'none', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
+                        disabled={isPending}
+                      >
+                        ✓ HECHO
+                      </button>
+                    </div>
                   )}
                   {item.isPast && item.id && (
                     <a href={`/calendar/${item.id}/edit`} style={{ fontSize: '10px', color: '#3498DB', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', border: '1px solid #3498DB', borderRadius: '4px', textAlign: 'center' }}>

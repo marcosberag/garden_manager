@@ -542,3 +542,28 @@ export async function postponeEvent(id: string) {
   revalidatePath('/');
   revalidatePath('/calendar');
 }
+
+export async function completeEvent(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data: event } = await supabase.from('events').select('notes').eq('id', id).single();
+  
+  if (event) {
+    let newNotes = event.notes || '';
+    newNotes = newNotes.replace(/\[PROGRAMADO\]/g, '').replace(/\[POSPUESTO\]/g, '').trim();
+    newNotes = newNotes ? `${newNotes} [HECHO]` : '[HECHO]';
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    await supabase
+      .from('events')
+      .update({ notes: newNotes, date: todayStr })
+      .match({ id, user_id: user.id });
+      
+    revalidatePath('/');
+    revalidatePath('/calendar');
+  }
+}
