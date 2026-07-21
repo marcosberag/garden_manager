@@ -549,20 +549,71 @@ export async function completeEvent(id: string) {
 
   if (!user) throw new Error('Usuario no autenticado');
 
-  const { data: event } = await supabase.from('events').select('notes').eq('id', id).single();
+  const { data: event } = await supabase.from('events').select('*').eq('id', id).single();
   
   if (event) {
     let newNotes = event.notes || '';
+    
+    // Extraer la frecuencia si existe antes de limpiar las notas
+    const freqMatch = newNotes.match(/\[FREQ:(\d+)\]/);
+    let frequency_days = 0;
+    if (freqMatch) {
+      frequency_days = parseInt(freqMatch[1], 10);
+    }
+    
     newNotes = newNotes.replace(/\[PROGRAMADO\]/g, '').replace(/\[POSPUESTO\]/g, '').trim();
     newNotes = newNotes ? `${newNotes} [HECHO]` : '[HECHO]';
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayObj = new Date();
+    // Forzamos la zona horaria a medianoche para evitar desajustes
+    todayObj.setHours(0, 0, 0, 0); 
+    
+    const getLocalDateString = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const todayStr = getLocalDateString(todayObj);
 
     await supabase
       .from('events')
       .update({ notes: newNotes, date: todayStr })
       .match({ id, user_id: user.id });
       
+    // Si la tarea tenía una frecuencia, debemos re-programar los próximos eventos a partir de HOY
+    if (frequency_days > 0) {
+      // 1. Borrar los eventos futuros programados para esta misma tarea
+      let deleteQuery = supabase.from('events').delete()
+        .eq('user_id', user.id)
+        .eq('type', event.type)
+        .like('notes', '%[PROGRAMADO]%');
+        
+      if (event.plant_id) deleteQuery = deleteQuery.eq('plant_id', event.plant_id);
+      else deleteQuery = deleteQuery.is('plant_id', null);
+      
+      if (event.product_id) deleteQuery = deleteQuery.eq('product_id', event.product_id);
+      else deleteQuery = deleteQuery.is('product_id', null);
+      
+      await deleteQuery;
+      
+      // 2. Crear los 3 próximos eventos calculados desde HOY
+      let nextDate = new Date(todayObj);
+      nextDate.setDate(nextDate.getDate() + frequency_days);
+      
+      let futureEventsToInsert = [];
+      for (let i = 0; i < 3; i++) {
+        futureEventsToInsert.push({
+          user_id: user.id,
+          type: event.type,
+          date: getLocalDateString(nextDate),
+          notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días. [FREQ:${frequency_days}] (Manual)`,
+          plant_id: event.plant_id || null,
+          product_id: event.product_id || null
+        });
+        nextDate.setDate(nextDate.getDate() + frequency_days);
+      }
+      
+      if (futureEventsToInsert.length > 0) {
+        await supabase.from('events').insert(futureEventsToInsert);
+      }
+    }
+
     revalidatePath('/');
     revalidatePath('/calendar');
   }
