@@ -118,11 +118,11 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
         <div style={{ marginTop: '15px', display: 'flex', gap: '15px', justifyContent: 'center', fontSize: '10px', color: 'var(--color-graphite)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <div style={{ width: '10px', height: '10px', backgroundColor: '#E8F6F3', borderRadius: '2px' }}></div>
-            <span>Hecho</span>
+            <span>Registro</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-ink-black)', borderRadius: '2px' }}></div>
-            <span>Pendiente</span>
+            <span>Tarea Pendiente</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <div style={{ width: '10px', height: '10px', backgroundColor: '#FDEDEC', borderRadius: '2px' }}></div>
@@ -131,6 +131,44 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
         </div>
       </div>
     );
+  };
+
+  const formatEuropeanDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const parseReason = (reason: string) => {
+    const tags: { text: string, color: string, bg: string }[] = [];
+    let cleanText = reason;
+
+    if (cleanText.includes('[PROGRAMADO]')) {
+      tags.push({ text: 'PROGRAMADO', color: '#8E44AD', bg: '#F4ECF7' });
+      cleanText = cleanText.replace(/\[PROGRAMADO\]/g, '');
+    }
+    if (cleanText.includes('[POSPUESTO]')) {
+      tags.push({ text: 'POSPUESTO', color: '#E67E22', bg: '#FEF5E7' });
+      cleanText = cleanText.replace(/\[POSPUESTO\]/g, '');
+    }
+    if (cleanText.includes('[HECHO]')) {
+      tags.push({ text: 'HECHO', color: '#27AE60', bg: '#EAFAF1' });
+      cleanText = cleanText.replace(/\[HECHO\]/g, '');
+    }
+    
+    const freqMatch = cleanText.match(/\[FREQ:(\d+)\]/);
+    if (freqMatch) {
+      tags.push({ text: `CADA ${freqMatch[1]} DÍAS`, color: '#2980B9', bg: '#EBF5FB' });
+      cleanText = cleanText.replace(/\[FREQ:\d+\]/g, '');
+    }
+    
+    // Remove empty parenthesis if left behind by frequency removal like "(Manual)"
+    cleanText = cleanText.replace(/\(Manual\)/g, '').replace(/\(\)/g, '').trim();
+    
+    return { cleanText, tags };
   };
 
   const renderList = () => {
@@ -188,6 +226,8 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
             borderColor = '#3498DB'; // Blue for today
           }
 
+          const { cleanText, tags } = parseReason(item.reason);
+
           return (
             <div key={idx} className="card" style={{ 
               borderLeft: `4px solid ${borderColor}`,
@@ -197,7 +237,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
               padding: '15px', borderRadius: '8px'
             }}>
               <div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
                   <span style={{ 
                     fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', 
                     backgroundColor: item.isPast ? '#E5E7E9' : (isUrgent ? '#FDEDEC' : (isToday ? '#EBF5FB' : 'var(--color-mist)')),
@@ -207,8 +247,8 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                     {item.isPast ? `✓ ${item.type}` : item.type}
                   </span>
                   {isUrgent && <span style={{ fontSize: '10px', color: '#E74C3C', fontWeight: 'bold' }}>ATRASADO</span>}
-                  {isToday && <span style={{ fontSize: '10px', color: '#2874A6', fontWeight: 'bold' }}>PARA HOY</span>}
-                  {item.isPast && <span style={{ fontSize: '10px', color: '#7F8C8D', fontWeight: 'bold' }}>HISTORIAL</span>}
+                  {isToday && <span style={{ fontSize: '10px', color: '#2874A6', fontWeight: 'bold' }}>TAREA PENDIENTE</span>}
+                  {item.isPast && <span style={{ fontSize: '10px', color: '#7F8C8D', fontWeight: 'bold' }}>REGISTRO</span>}
                 </div>
                 
                 <h3 className="suisse" style={{ fontSize: '16px', margin: '0 0 6px 0', color: item.isPast ? '#5D6D7E' : 'var(--color-ink-black)', textDecoration: item.isPast ? 'line-through' : 'none' }}>
@@ -222,7 +262,23 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                   })()}
                 </h3>
                 
-                <p className="body-text" style={{ fontSize: '13px', marginBottom: '8px', lineHeight: '1.4', color: item.isPast ? '#7F8C8D' : 'inherit' }}>{item.reason}</p>
+                {cleanText && (
+                  <p className="body-text" style={{ fontSize: '13px', marginBottom: '8px', lineHeight: '1.4', color: item.isPast ? '#7F8C8D' : 'inherit' }}>{cleanText}</p>
+                )}
+                
+                {tags.length > 0 && (
+                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    {tags.map((tag, i) => (
+                      <span key={i} style={{ 
+                        fontSize: '9px', fontWeight: 'bold', 
+                        backgroundColor: tag.bg, color: tag.color, 
+                        padding: '2px 6px', borderRadius: '4px' 
+                      }}>
+                        {tag.text}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 
                 {!item.isPast && item.product_name && (
                   <div style={{ fontSize: '12px', color: 'var(--color-graphite)' }}>
@@ -233,8 +289,8 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
               
               <div style={{ textAlign: 'right', minWidth: '85px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', height: '100%' }}>
                 <div>
-                  <span style={{ fontSize: '10px', color: 'var(--color-graphite)', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>{item.isPast ? 'Realizado' : 'Fecha'}</span>
-                  <span style={{ fontSize: '14px', color: item.isPast ? '#7F8C8D' : (isUrgent ? '#E74C3C' : (isToday ? '#2874A6' : 'var(--color-ink-black)')), fontWeight: 'bold' }}>{item.date}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--color-graphite)', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>{item.isPast ? 'Registro' : 'Fecha'}</span>
+                  <span style={{ fontSize: '14px', color: item.isPast ? '#7F8C8D' : (isUrgent ? '#E74C3C' : (isToday ? '#2874A6' : 'var(--color-ink-black)')), fontWeight: 'bold' }}>{formatEuropeanDate(item.date)}</span>
                 </div>
                 
                 <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>

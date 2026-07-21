@@ -5,29 +5,69 @@ import { deleteAllEvents } from '@/app/actions';
 
 export default function ClearEventsButton() {
   const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleClear = async () => {
-    if (confirm('¿Estás SEGURO de que quieres borrar absolutamente todos los eventos de tu agenda? Esta acción no se puede deshacer.')) {
-      setLoading(true);
-      try {
-        await deleteAllEvents();
-      } catch (e) {
-        setLoading(false);
-      }
+    setLoading(true);
+    setShowConfirm(false);
+    try {
+      await deleteAllEvents();
+    } catch (e) {
+      setLoading(false);
     }
   };
 
   return (
-    <button 
-      onClick={handleClear} 
-      disabled={loading}
-      style={{ 
-        color: '#E74C3C', backgroundColor: 'transparent', border: '1px solid #E74C3C', 
-        textDecoration: 'none', fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', 
-        borderRadius: '4px', cursor: 'pointer', opacity: loading ? 0.5 : 1 
-      }}
-    >
-      {loading ? 'BORRANDO...' : 'LIMPIAR'}
-    </button>
+    <>
+      <button 
+        onClick={() => setShowConfirm(true)} 
+        disabled={loading}
+        style={{ 
+          color: '#E74C3C', backgroundColor: 'transparent', border: '1px solid #E74C3C', 
+          textDecoration: 'none', fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', 
+          borderRadius: '4px', cursor: 'pointer', opacity: loading ? 0.5 : 1 
+        }}
+      >
+        {loading ? 'BORRANDO...' : 'LIMPIAR'}
+      </button>
+
+      {showConfirm && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            backgroundColor: 'white', padding: '30px', borderRadius: '12px',
+            width: '90%', maxWidth: '400px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+          }}>
+            <h3 className="suisse" style={{ margin: '0 0 15px 0', fontSize: '18px', color: 'var(--color-ink-black)' }}>
+              ¿Borrar Todo el Calendario?
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--color-graphite)', lineHeight: '1.5' }}>
+              Estás a punto de eliminar <strong>absolutamente todos</strong> los eventos, registros y tareas programadas de tu agenda. Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button 
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="btn-outline"
+                style={{ padding: '8px 16px', fontSize: '14px' }}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                onClick={handleClear}
+                className="btn-solid"
+                style={{ padding: '8px 16px', fontSize: '14px', backgroundColor: 'var(--color-alert)' }}
+              >
+                Sí, Borrar Todo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
