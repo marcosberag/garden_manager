@@ -136,15 +136,6 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
 
   const handleLocationSelect = async (lat: number, lng: number) => {
     if (!selectedPlantId) {
-      setModal({
-        type: 'confirm',
-        message: '¿Quieres extraer la parcela de este punto? (Se reemplazará la actual)',
-        onConfirm: async () => {
-          setModal(null);
-          await executeCatastroExtraction(lat, lng);
-        },
-        onCancel: () => setModal(null)
-      });
       return;
     }
     
