@@ -46,9 +46,9 @@ export async function GET() {
     let msgLines: string[] = [];
 
     // Pending real events in the future (including today)
-    const pendingEvents = events?.filter(e => (!e.notes || !e.notes.includes('[PROGRAMADO]')) && e.date >= todayStr) || [];
+    const pendingEvents = events?.filter(e => (!e.notes || !e.notes.includes('[PROGRAMADO]')) && (!e.notes || !e.notes.includes('[HECHO]')) && e.date >= todayStr) || [];
     // Programmed events
-    const programmedEvents = events?.filter(e => e.notes?.includes('[PROGRAMADO]')) || [];
+    const programmedEvents = events?.filter(e => e.notes?.includes('[PROGRAMADO]') && (!e.notes || !e.notes.includes('[HECHO]'))) || [];
 
     const allPending = [...pendingEvents, ...programmedEvents];
 
@@ -136,8 +136,9 @@ export async function GET() {
     for (const contact of contacts) {
       if (contact.phone_number && contact.api_key) {
         const text = encodeURIComponent(finalMessage);
-        const cleanPhone = contact.phone_number.replace(/\D/g, '');
-        const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${text}&apikey=${contact.api_key}`;
+        const cleanPhone = contact.phone_number.replace(/[^\d+]/g, '');
+        const encodedPhone = encodeURIComponent(cleanPhone);
+        const url = `https://api.callmebot.com/whatsapp.php?phone=${encodedPhone}&text=${text}&apikey=${contact.api_key}`;
         
         try {
           const callMeBotRes = await fetch(url);
