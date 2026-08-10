@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { createClient as createServerClient } from '@/utils/supabase/server';
 import { createClient as createStandardClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const serverSupabase = await createServerClient();
     const { data: { user } } = await serverSupabase.auth.getUser();
@@ -15,6 +15,13 @@ export async function GET() {
       supabase = serverSupabase;
     } else {
       // Si lo ejecuta un servidor externo (Cron) a las 8AM, no hay cookies. Necesitamos la clave maestra.
+      // Como esa clave se salta las RLS, exigimos el CRON_SECRET que Vercel envía
+      // automáticamente en la cabecera Authorization al invocar el cron.
+      const cronSecret = process.env.CRON_SECRET;
+      if (!cronSecret || request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      }
+
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (!serviceKey) {
         return NextResponse.json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en .env.local para ejecuciones automáticas' }, { status: 401 });
