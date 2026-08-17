@@ -18,13 +18,28 @@ export async function GET(request: NextRequest) {
       // Como esa clave se salta las RLS, exigimos el CRON_SECRET que Vercel envía
       // automáticamente en la cabecera Authorization al invocar el cron.
       const cronSecret = process.env.CRON_SECRET;
-      if (!cronSecret || request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+      const esCronDeVercel = request.headers.get('user-agent')?.includes('vercel-cron') ?? false;
+
+      // Falta de configuración, no de credenciales: si respondiéramos 401 el cron
+      // fallaría en silencio y sería indistinguible de una petición no autorizada.
+      if (!cronSecret) {
+        console.error('[cron/whatsapp] CRON_SECRET no está definido en este despliegue, imposible autenticar el cron.', { esCronDeVercel });
+        return NextResponse.json(
+          { error: 'Falta CRON_SECRET en las variables de entorno del proyecto. Añádela en Vercel (Settings → Environment Variables) y vuelve a desplegar.' },
+          { status: 500 }
+        );
+      }
+
+      const authHeader = request.headers.get('authorization');
+      if (authHeader !== `Bearer ${cronSecret}`) {
+        console.error('[cron/whatsapp] Petición sin sesión con Authorization inválido.', { esCronDeVercel, traeCabecera: Boolean(authHeader) });
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
       }
 
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (!serviceKey) {
-        return NextResponse.json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en .env.local para ejecuciones automáticas' }, { status: 401 });
+        console.error('[cron/whatsapp] Falta SUPABASE_SERVICE_ROLE_KEY en este despliegue.');
+        return NextResponse.json({ error: 'Falta SUPABASE_SERVICE_ROLE_KEY en las variables de entorno para ejecuciones automáticas' }, { status: 500 });
       }
       supabase = createStandardClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey);
     }
@@ -140,6 +155,7 @@ export async function GET(request: NextRequest) {
     }
 
     const messagesSent = [];
+    const sendErrors = [];
     for (const contact of contacts) {
       if (contact.phone_number && contact.api_key) {
         const text = encodeURIComponent(finalMessage);
@@ -154,14 +170,22 @@ export async function GET(request: NextRequest) {
             messagesSent.push(`callmebot_${cleanPhone}`);
           } else {
             console.error(`Error CallMeBot para ${cleanPhone}:`, resultText);
+            sendErrors.push(`${cleanPhone}: ${resultText.slice(0, 200)}`);
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error(`Fetch error para ${cleanPhone}:`, e);
+          sendErrors.push(`${cleanPhone}: ${e.message}`);
         }
       }
     }
 
-    return NextResponse.json({ success: true, messagesSent });
+    // Si había que avisar y no salió ni un mensaje, el cron tiene que fallar de
+    // forma visible en los logs en vez de responder 200 como si todo hubiera ido bien.
+    if (messagesSent.length === 0) {
+      return NextResponse.json({ error: 'No se pudo enviar ningún WhatsApp', sendErrors }, { status: 502 });
+    }
+
+    return NextResponse.json({ success: true, messagesSent, sendErrors });
 
   } catch (error: any) {
     console.error('Error al enviar WhatsApp:', error);
