@@ -1,9 +1,16 @@
+import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { modelo } from '@/lib/ai';
 import { z } from 'zod';
 
 export async function GET(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q');
 

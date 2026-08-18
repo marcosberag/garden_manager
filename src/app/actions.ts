@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { deducirFrecuencia, leerFrecuencia } from '@/lib/frecuencias';
+import { deducirFrecuencia, leerFrecuencia, etiquetaDeMetodo } from '@/lib/frecuencias';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
 
 export async function addPlant(formData: FormData) {
@@ -328,9 +328,18 @@ export async function addEvent(formData: FormData) {
   const notes = formData.get('notes') as string;
   const plant_id = formData.get('plant_id') as string;
   const product_id = formData.get('product_id') as string;
-  
+  const application_method = formData.get('application_method') as string;
+
   const frequency_days_str = formData.get('frequency_days') as string;
   const frequency_days = frequency_days_str ? parseInt(frequency_days_str, 10) : 0;
+
+  // El modo de aplicación viaja dentro de las notas, en texto legible: no hace
+  // falta otra columna y el calendario y los avisos ya enseñan las notas.
+  const etiquetaMetodo = etiquetaDeMetodo(application_method || null);
+  const notasUsuario = notes?.trim() || '';
+  const notasFinales = notasUsuario
+    ? (etiquetaMetodo ? `${notasUsuario} (aplicación ${etiquetaMetodo})` : notasUsuario)
+    : (etiquetaMetodo ? `Aplicación ${etiquetaMetodo}.` : null);
 
   const finalDates = dates.length > 0 ? dates : (dateFallback ? [dateFallback] : []);
 
@@ -377,7 +386,7 @@ export async function addEvent(formData: FormData) {
         user_id: user.id,
         type,
         date: getLocalDateString(nextDate),
-        notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días.`,
+        notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días${etiquetaMetodo ? ` (aplicación ${etiquetaMetodo})` : ''}.`,
         frequency_days,
         plant_id: plant_id || null,
         product_id: product_id || null
@@ -390,7 +399,7 @@ export async function addEvent(formData: FormData) {
     user_id: user.id,
     type,
     date: d,
-    notes: notes || null,
+    notes: notasFinales,
     frequency_days: frequency_days > 0 ? frequency_days : null,
     plant_id: plant_id || null,
     product_id: product_id || null
@@ -660,4 +669,50 @@ function leerFrecuenciaDelFormulario(formData: FormData): number | null {
   if (!bruto) return null;
   const dias = parseInt(bruto, 10);
   return Number.isFinite(dias) && dias > 0 ? dias : null;
+}
+
+/**
+ * Alta de un producto identificado por foto desde el formulario de tratamiento.
+ * A diferencia de addProduct no redirige: devuelve la fila insertada para que
+ * el formulario la seleccione al momento.
+ */
+export async function addProductFromScan(identificado: {
+  name: string;
+  type: string;
+  description?: string | null;
+  frequency_days?: number | null;
+}): Promise<{ product?: any; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const { name, type } = identificado;
+  if (!name || !type) return { error: 'La identificación llegó incompleta' };
+
+  // La pauta leída de la etiqueta manda; si no se pudo leer, se deduce igual
+  // que al dar de alta un producto a mano.
+  const frequency_days = identificado.frequency_days
+    ?? (await deducirFrecuencia(name, type, identificado.description)).frequency_days;
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert({
+      user_id: user.id,
+      name,
+      type,
+      description: identificado.description || null,
+      frequency_days,
+      frequency_source: 'ia',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error al guardar el producto identificado:', error);
+    return { error: 'No se pudo guardar el producto en el inventario' };
+  }
+
+  revalidatePath('/products');
+  return { product: data };
 }

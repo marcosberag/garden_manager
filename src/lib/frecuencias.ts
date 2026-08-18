@@ -96,3 +96,97 @@ export function leerFrecuencia(evento: EventoConFrecuencia): number {
   const etiqueta = evento.notes?.match(/\[FREQ:(\d+)\]/);
   return etiqueta ? parseInt(etiqueta[1], 10) : 0;
 }
+
+export type CasoTratamiento = {
+  producto: { nombre: string; tipo?: string | null; descripcion?: string | null };
+  planta?: { nombre?: string | null; especie?: string | null } | null;
+  metodo?: string | null;
+  notas?: string | null;
+};
+
+export type FrecuenciaDelCaso = {
+  frequency_days: number;
+  min_days: number | null;
+  max_days: number | null;
+  motivo: string;
+};
+
+// Valores del selector de modo de aplicación del formulario de tratamiento.
+const METODOS: Record<string, string> = {
+  foliar: 'foliar, pulverizando las hojas',
+  raiz: 'en la raíz, con el agua de riego',
+  suelo: 'al suelo, incorporado',
+};
+
+export function textoDeMetodo(metodo?: string | null): string | null {
+  if (!metodo) return null;
+  return METODOS[metodo] ?? metodo;
+}
+
+/**
+ * Pauta para un tratamiento concreto. A diferencia de deducirFrecuencia, que da
+ * la pauta general del producto, aquí cuentan la planta, el modo de aplicación
+ * (el cobre foliar no se repite igual que un fungicida al riego) y lo que el
+ * usuario cuente en las notas (severidad, clima...). Devuelve null si la IA no
+ * está disponible: el formulario se queda entonces con la pauta del producto.
+ */
+export async function frecuenciaSegunCaso(caso: CasoTratamiento): Promise<FrecuenciaDelCaso | null> {
+  const lineas = [`- Producto: "${caso.producto.nombre}"${caso.producto.tipo ? ` (${caso.producto.tipo})` : ''}`];
+  if (caso.producto.descripcion) lineas.push(`- Notas del producto: "${caso.producto.descripcion}"`);
+  const planta = [caso.planta?.nombre, caso.planta?.especie].filter(Boolean).join(', ');
+  if (planta) lineas.push(`- Planta tratada: ${planta}`);
+  const metodo = textoDeMetodo(caso.metodo);
+  if (metodo) lineas.push(`- Modo de aplicación: ${metodo}`);
+  if (caso.notas?.trim()) lineas.push(`- Notas del usuario sobre este tratamiento: "${caso.notas.trim()}"`);
+
+  try {
+    const { object } = await generateObject({
+      model: modelo(),
+      schema: z.object({
+        frequency_days: z.number().describe('Cada cuántos días repetir ESTE tratamiento concreto. 0 si no procede repetirlo de forma periódica.'),
+        min_days: z.number().describe('Límite inferior del rango habitual de la pauta, en días. 0 si no hay rango.'),
+        max_days: z.number().describe('Límite superior del rango habitual de la pauta, en días. 0 si no hay rango.'),
+        motivo: z.string().describe('Una o dos frases en español justificando la pauta para este caso: modo de aplicación, especie y severidad si se conocen. Sin repetir el nombre del producto.'),
+      }),
+      prompt: `Eres un ingeniero agrónomo. Un usuario va a registrar este tratamiento en su jardín doméstico:
+${lineas.join('\n')}
+
+Indica cada cuántos días conviene repetirlo EN ESTE CASO CONCRETO, no la pauta genérica del producto:
+- El modo de aplicación importa: una aplicación foliar no sigue la misma pauta que la misma materia activa al riego o al suelo.
+- La especie importa: usa la pauta adecuada para esa planta si la conoces.
+- Si las notas indican severidad ("hay bastante", "muy avanzado"...), acorta hacia el mínimo del rango habitual; si es un uso preventivo, alarga hacia el máximo.
+Devuelve también el rango habitual (mínimo y máximo en días) para que el usuario pueda ajustar con criterio.`,
+      temperature: 0.2,
+    });
+
+    const dias = Math.round(object.frequency_days);
+    if (dias < MIN_DIAS || dias > MAX_DIAS) return null;
+
+    const min = Math.round(object.min_days);
+    const max = Math.round(object.max_days);
+    // El rango solo se enseña si es coherente con la recomendación.
+    const rangoValido = min >= MIN_DIAS && max <= MAX_DIAS && min <= dias && dias <= max && min < max;
+
+    return {
+      frequency_days: dias,
+      min_days: rangoValido ? min : null,
+      max_days: rangoValido ? max : null,
+      motivo: object.motivo,
+    };
+  } catch (error) {
+    console.error('[frecuencias] Fallo calculando la pauta del caso, se mantiene la del producto:', error);
+    return null;
+  }
+}
+
+// Versión corta del modo, para incrustarla en las notas del evento.
+const ETIQUETAS_METODO: Record<string, string> = {
+  foliar: 'foliar',
+  raiz: 'en la raíz',
+  suelo: 'al suelo',
+};
+
+export function etiquetaDeMetodo(metodo?: string | null): string | null {
+  if (!metodo) return null;
+  return ETIQUETAS_METODO[metodo] ?? metodo;
+}

@@ -1,8 +1,15 @@
+import { createClient } from '@/utils/supabase/server';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { modelo } from '@/lib/ai';
 
 export async function GET(req: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q');

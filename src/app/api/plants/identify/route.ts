@@ -1,8 +1,15 @@
+import { createClient } from '@/utils/supabase/server';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { modelo } from '@/lib/ai';
 
 export async function POST(req: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return Response.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get('image') as File;
