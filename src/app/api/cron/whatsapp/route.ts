@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient as createServerClient } from '@/utils/supabase/server';
 import { createClient as createStandardClient } from '@supabase/supabase-js';
+import { enviarWhatsApp } from '@/lib/callmebot';
 
 export const dynamic = 'force-dynamic';
 
@@ -158,23 +159,17 @@ export async function GET(request: NextRequest) {
     const sendErrors = [];
     for (const contact of contacts) {
       if (contact.phone_number && contact.api_key) {
-        const text = encodeURIComponent(finalMessage);
-        const cleanPhone = contact.phone_number.replace(/[^\d+]/g, '');
-        const encodedPhone = encodeURIComponent(cleanPhone);
-        const url = `https://api.callmebot.com/whatsapp.php?phone=${encodedPhone}&text=${text}&apikey=${contact.api_key}`;
-        
         try {
-          const callMeBotRes = await fetch(url);
-          const resultText = await callMeBotRes.text();
-          if (callMeBotRes.ok && !resultText.toLowerCase().includes('error') && !resultText.toLowerCase().includes('invalid')) {
-            messagesSent.push(`callmebot_${cleanPhone}`);
+          const { ok, respuesta } = await enviarWhatsApp(contact.phone_number, contact.api_key, finalMessage);
+          if (ok) {
+            messagesSent.push(contact.phone_number);
           } else {
-            console.error(`Error CallMeBot para ${cleanPhone}:`, resultText);
-            sendErrors.push(`${cleanPhone}: ${resultText.slice(0, 200)}`);
+            console.error(`Error CallMeBot para ${contact.phone_number}:`, respuesta);
+            sendErrors.push(`${contact.phone_number}: ${respuesta}`);
           }
         } catch (e: any) {
-          console.error(`Fetch error para ${cleanPhone}:`, e);
-          sendErrors.push(`${cleanPhone}: ${e.message}`);
+          console.error(`Fetch error para ${contact.phone_number}:`, e);
+          sendErrors.push(`${contact.phone_number}: ${e.message}`);
         }
       }
     }
