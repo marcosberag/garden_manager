@@ -142,7 +142,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
     return dateStr;
   };
 
-  const parseReason = (reason: string) => {
+  const parseReason = (reason: string, frequencyDays?: number | null) => {
     const tags: { text: string, color: string, bg: string }[] = [];
     let cleanText = reason;
 
@@ -159,14 +159,19 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
       cleanText = cleanText.replace(/\[HECHO\]/g, '');
     }
     
-    const freqMatch = cleanText.match(/\[FREQ:(\d+)\]/);
-    if (freqMatch) {
-      tags.push({ text: `CADA ${freqMatch[1]} DÍAS`, color: '#2980B9', bg: '#EBF5FB' });
-      cleanText = cleanText.replace(/\[FREQ:\d+\]/g, '');
+    // La frecuencia viene de la columna del evento. Los eventos antiguos la
+    // llevan escrita en el propio texto como "[FREQ:15] (Manual)": se lee de ahí
+    // como respaldo y se limpia para que no salga en pantalla.
+    const etiquetaAntigua = cleanText.match(/\[FREQ:(\d+)\]/);
+    const dias = frequencyDays || (etiquetaAntigua ? parseInt(etiquetaAntigua[1], 10) : 0);
+    if (dias > 0) {
+      tags.push({ text: `CADA ${dias} DÍAS`, color: '#2980B9', bg: '#EBF5FB' });
     }
-    
-    // Remove empty parenthesis if left behind by frequency removal like "(Manual)"
-    cleanText = cleanText.replace(/\(Manual\)/g, '').replace(/\(\)/g, '').trim();
+    cleanText = cleanText
+      .replace(/\[FREQ:\d+\]/g, '')
+      .replace(/\(Manual\)/g, '')
+      .replace(/\(\)/g, '')
+      .trim();
     
     return { cleanText, tags };
   };
@@ -182,6 +187,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
         plant_name: e.plants?.name || e.plants?.species || 'General',
         product_name: e.products?.name || '',
         reason: e.notes || (e.date <= todayStr ? 'Tratamiento completado y registrado.' : 'Tarea pendiente de realizar.'),
+        frequency_days: e.frequency_days,
         date: e.date,
         urgency: e.date <= todayStr ? (e.date < todayStr ? 'alta' : 'media') : 'baja',
         isPast: e.notes?.includes('[HECHO]') || (e.date < todayStr && !e.notes?.includes('[PROGRAMADO]')),
@@ -226,7 +232,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
             borderColor = '#3498DB'; // Blue for today
           }
 
-          const { cleanText, tags } = parseReason(item.reason);
+          const { cleanText, tags } = parseReason(item.reason, (item as { frequency_days?: number | null }).frequency_days);
 
           return (
             <div key={idx} className="card" style={{ 

@@ -4,23 +4,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, GeoJSON, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { pinDePlanta, TAMANO_PIN, ANCLA_PIN } from '@/lib/plant-icons';
 
-// Fix for default marker icons in Next.js + Leaflet
-const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
-const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
-const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
-
-const DefaultIcon = L.icon({
-  iconUrl,
-  iconRetinaUrl,
-  shadowUrl,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  tooltipAnchor: [16, -28],
-  shadowSize: [41, 41]
+// Todas las plantas usan un pin propio (ver más abajo). Se sustituye también el
+// marcador por defecto de Leaflet, que se descargaba de unpkg.com, para no
+// depender de un CDN externo por un icono que nunca se llega a ver.
+L.Marker.prototype.options.icon = L.divIcon({
+  className: 'custom-plant-icon',
+  html: pinDePlanta('generica'),
+  iconSize: TAMANO_PIN,
+  iconAnchor: ANCLA_PIN,
 });
-L.Marker.prototype.options.icon = DefaultIcon;
 
 interface Plant {
   id: string;
@@ -34,9 +28,12 @@ interface Plant {
   age?: string;
   health?: string;
   icon_emoji?: string;
+  icon_category?: string;
   image_url?: string;
   path?: [number, number][];
 }
+
+const VERDE_APP = '#778643';
 
 interface MapComponentProps {
   plants: Plant[];
@@ -157,25 +154,21 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
 
         {parcel && plants.filter(p => (p.lat && p.lng) || (p.path && p.path.length > 0)).map(plant => {
           
-          let iconHtml = '';
-          
-          if (plant.image_url) {
-            // Foto Real (Borde Verde)
-            iconHtml = `<div style="width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--color-eucalyptus); box-shadow: 0 4px 6px rgba(0,0,0,0.3); overflow: hidden; background-color: white;">
-              <img src="${plant.image_url}" style="width: 100%; height: 100%; object-fit: cover;" />
-            </div>`;
-          } else {
-            // Icono Genérico (Borde Gris)
-            const emoji = plant.icon_emoji || '🌱';
-            iconHtml = `<div style="background-color: white; width: 32px; height: 32px; border-radius: 50%; border: 2px solid #aaa; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #333;">${emoji}</div>`;
-          }
+          // Con foto manda la foto; si no, el pin de la categoría de la planta.
+          const iconHtml = plant.image_url
+            ? `<div style="width: 42px; height: 42px; border-radius: 50%; border: 3px solid ${VERDE_APP}; box-shadow: 0 3px 6px rgba(0,0,0,0.35); overflow: hidden; background-color: white;">
+                 <img src="${plant.image_url}" style="width: 100%; height: 100%; object-fit: cover;" />
+               </div>`
+            : pinDePlanta(plant.icon_category);
 
           const plantIcon = L.divIcon({
             className: 'custom-plant-icon',
             html: iconHtml,
-            iconSize: plant.image_url ? [36, 36] : [32, 32],
-            iconAnchor: plant.image_url ? [18, 18] : [16, 16],
-            popupAnchor: [0, -18]
+            // La foto es un círculo y se centra en la coordenada; el pin apoya
+            // su punta en ella.
+            iconSize: plant.image_url ? [42, 42] : TAMANO_PIN,
+            iconAnchor: plant.image_url ? [21, 21] : ANCLA_PIN,
+            popupAnchor: plant.image_url ? [0, -22] : [0, -46]
           });
           
           let centerLat = plant.lat;

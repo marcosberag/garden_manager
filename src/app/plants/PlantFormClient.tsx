@@ -48,8 +48,6 @@ export default function PlantFormClient({ initialData, isEdit = false }: { initi
       
       <form action={formAction} style={{ display: 'flex', flexDirection: 'column', gap: '30px', marginTop: isEdit ? '0' : '20px' }}>
         
-        <input type="hidden" name="icon_emoji" value="🌱" />
-        
         {/* ESPECIE (Principal) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', zIndex: 50 }}>
           <label htmlFor="species" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>Especie de la Planta *</label>

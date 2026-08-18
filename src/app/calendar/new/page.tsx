@@ -14,7 +14,7 @@ export default async function NewEventPage() {
 
   // Fetch plants and products for the dropdowns
   const { data: plants } = await supabase.from('plants').select('id, name, species').eq('user_id', user.id);
-  const { data: products } = await supabase.from('products').select('id, name, type').eq('user_id', user.id);
+  const { data: products } = await supabase.from('products').select('id, name, type, frequency_days').eq('user_id', user.id);
 
   const today = new Date().toISOString().split('T')[0];
 

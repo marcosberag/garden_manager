@@ -1,10 +1,6 @@
 import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
-
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-});
+import { modelo } from '@/lib/ai';
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +15,7 @@ export async function POST(req: Request) {
     const base64Image = buffer.toString('base64');
 
     const { object } = await generateObject({
-      model: google('gemini-1.5-flash'),
+      model: modelo(),
       schema: z.object({
         species: z.string().describe('El nombre botánico o científico exacto de la planta, o el nombre común si el botánico es desconocido. Ej: "Monstera deliciosa"'),
       }),

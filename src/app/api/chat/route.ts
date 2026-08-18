@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { createClient } from '@/utils/supabase/server';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { modelo } from '@/lib/ai';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
 
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   3. Si el usuario te pide registrar múltiples fechas o múltiples acciones de golpe, EJECUTA LA HERRAMIENTA VARIAS VECES (una por cada fecha/acción).
   4. NO pidas confirmación a menos que falte información vital que no puedas deducir.
   5. Una vez ejecutadas las herramientas, responde al usuario confirmando de forma resumida y amigable lo que has hecho.
-  6. Si el usuario te indica una frecuencia (ej. cada X días), añade al campo 'notes' exactamente la etiqueta [FREQ:X] (ej. [FREQ:7]).
+  6. Si el usuario te indica una frecuencia (ej. cada X días), pásala en el campo 'frequency_days' (ej. 7). No la escribas dentro de 'notes'.
   7. Si tienes que buscar el UUID de una planta o producto, búscalo en el CONTEXTO proporcionado.
   8. Para fechas, asume el año actual (${new Date().getFullYear()}) si no se especifica. Convierte fechas como "24 de mayo" a formato "YYYY-05-24".
 
@@ -49,13 +49,9 @@ export async function POST(req: Request) {
   ${context}
   `;
 
-  const google = createGoogleGenerativeAI({
-    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
-  });
-
   try {
     const result = streamText({
-      model: google('gemini-3.5-flash'),
+      model: modelo(),
       system: systemPrompt,
       messages,
       tools: {
@@ -64,15 +60,17 @@ export async function POST(req: Request) {
           parameters: z.object({
             type: z.string().describe('Fumigación, Poda u Otro'),
             date: z.string().describe('Fecha en formato YYYY-MM-DD'),
-            notes: z.string().optional().describe('Notas o detalles. INCLUIR SIEMPRE [FREQ:X] si el usuario indicó una frecuencia en días.'),
+            notes: z.string().optional().describe('Notas o detalles del tratamiento.'),
+            frequency_days: z.number().optional().describe('Cada cuántos días se repite, si el usuario ha indicado una frecuencia.'),
             plant_id: z.string().optional().describe('ID (UUID) exacto de la planta, extráelo del contexto'),
             product_id: z.string().optional().describe('ID (UUID) exacto del producto, extráelo del contexto'),
           }),
           execute: async (args) => {
-            const { type, date, notes, plant_id, product_id } = args;
+            const { type, date, notes, frequency_days, plant_id, product_id } = args;
             if (!user) return 'No autenticado';
             const { error } = await supabase.from('events').insert({
-              user_id: user.id, type, date, notes: notes || null, plant_id: plant_id || null, product_id: product_id || null
+              user_id: user.id, type, date, notes: notes || null, frequency_days: frequency_days || null,
+              plant_id: plant_id || null, product_id: product_id || null
             });
             return error ? `Error de BD: ${error.message}` : 'Tratamiento registrado con éxito en la base de datos.';
           }

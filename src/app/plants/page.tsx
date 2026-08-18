@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { svgDePlanta } from '@/lib/plant-icons';
 import { createClient } from '@/utils/supabase/server';
 import PlantActions from './PlantActions';
 
@@ -33,7 +34,10 @@ export default async function PlantsPage() {
               {plants?.map(plant => (
                 <div key={plant.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
-                    <span style={{ fontSize: '24px', marginRight: '10px' }}>{plant.icon_emoji || '🌱'}</span>
+                    <span
+                      style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '10px', lineHeight: 0 }}
+                      dangerouslySetInnerHTML={{ __html: svgDePlanta(plant.icon_category, 26) }}
+                    />
                     <span style={{ fontSize: '12px', color: 'var(--color-eucalyptus)', textTransform: 'uppercase', letterSpacing: '1px' }}>{plant.species || 'Especie Desconocida'}</span>
                     <h3 className="suisse" style={{ fontSize: '24px', margin: '15px 0' }}>{plant.name || plant.species}</h3>
                     {plant.location && <p className="body-text" style={{ fontSize: '14px', marginBottom: '5px' }}><strong>📍 Ubicación:</strong> {plant.location}</p>}

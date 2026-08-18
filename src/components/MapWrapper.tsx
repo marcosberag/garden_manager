@@ -25,6 +25,7 @@ interface Plant {
   lat?: number;
   lng?: number;
   location?: string;
+  icon_category?: string;
   path?: [number, number][];
 }
 

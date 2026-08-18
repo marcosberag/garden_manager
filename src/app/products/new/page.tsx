@@ -93,6 +93,31 @@ export default function NewProductPage() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label htmlFor="frequency_days" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>Cada cuántos días se aplica</label>
+                <input
+                  type="number"
+                  id="frequency_days"
+                  name="frequency_days"
+                  min="1"
+                  max="365"
+                  placeholder="Déjalo vacío y lo deduzco por ti"
+                  style={{
+                    padding: '15px',
+                    backgroundColor: 'var(--color-pure-canvas)',
+                    border: '1px solid var(--color-mist)',
+                    borderRadius: '0',
+                    fontFamily: 'inherit',
+                    fontSize: '16px',
+                    color: 'var(--color-ink-black)',
+                    outline: 'none'
+                  }}
+                />
+                <p style={{ fontSize: '11px', color: 'var(--color-graphite)', margin: 0 }}>
+                  Se usará para proponer la repetición al registrar un tratamiento con este producto. Si lo dejas vacío, se calcula a partir del nombre y el tipo.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <label htmlFor="barcode" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>Código de Barras (Opcional)</label>
                 <input 
                   type="text" 

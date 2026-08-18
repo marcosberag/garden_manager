@@ -6,6 +6,17 @@ import { addEvent } from '@/app/actions';
 export default function NewEventForm({ plants, products, today }: { plants: any[], products: any[], today: string }) {
   const [dates, setDates] = useState<string[]>([today]);
   const [loading, setLoading] = useState(false);
+  const [frecuencia, setFrecuencia] = useState('');
+  const [productoElegido, setProductoElegido] = useState<any | null>(null);
+
+  // Cada producto guarda cada cuántos días se aplica. Al elegirlo rellenamos la
+  // repetición para no tener que saberse la pauta de memoria; sigue siendo
+  // editable, y lo que escriba el usuario manda.
+  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const producto = products?.find(p => p.id === e.target.value) || null;
+    setProductoElegido(producto);
+    setFrecuencia(producto?.frequency_days ? String(producto.frequency_days) : '');
+  };
 
   const handleAddDate = () => setDates([...dates, today]);
   const handleRemoveDate = (index: number) => setDates(dates.filter((_, i) => i !== index));
@@ -94,6 +105,7 @@ export default function NewEventForm({ plants, products, today }: { plants: any[
         <select 
           id="product_id" 
           name="product_id" 
+          onChange={handleProductChange}
           style={{
             padding: '15px', backgroundColor: 'var(--color-pure-canvas)', border: '1px solid var(--color-mist)',
             borderRadius: '0', fontFamily: 'inherit', fontSize: '16px', outline: 'none'
@@ -119,9 +131,16 @@ export default function NewEventForm({ plants, products, today }: { plants: any[
             style={{ width: '80px', marginBottom: 0, padding: '10px' }} 
             placeholder="Ej: 15"
             min="1"
+            value={frecuencia}
+            onChange={(e) => setFrecuencia(e.target.value)}
           />
           <span style={{ fontSize: '14px' }}>días</span>
         </div>
+        {productoElegido?.frequency_days && (
+          <p style={{ fontSize: '11px', color: 'var(--color-eucalyptus)', marginTop: '10px', marginBottom: 0 }}>
+            Pauta habitual de {productoElegido.name}: cada {productoElegido.frequency_days} días. Cámbiala si lo prefieres.
+          </p>
+        )}
         <p style={{ fontSize: '11px', color: '#666', marginTop: '10px', marginBottom: 0 }}>
           Si estableces una frecuencia, se programarán automáticamente 3 futuras aplicaciones para que te lleguen avisos de WhatsApp.
         </p>

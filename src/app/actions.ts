@@ -3,6 +3,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { deducirFrecuencia, leerFrecuencia } from '@/lib/frecuencias';
+import { resolverCategoria } from '@/lib/plant-icons-ai';
 
 export async function addPlant(formData: FormData) {
   const supabase = await createClient();
@@ -46,6 +48,9 @@ export async function addPlant(formData: FormData) {
     throw new Error('La especie o el nombre de la planta es obligatorio');
   }
 
+  // Categoría del icono del mapa, deducida de la especie.
+  const icon_category = await resolverCategoria(species, name);
+
   const { error } = await supabase.from('plants').insert({
     user_id: user.id,
     name,
@@ -55,6 +60,7 @@ export async function addPlant(formData: FormData) {
     size,
     age,
     icon_emoji: icon_emoji || null,
+    icon_category,
     image_url
   });
 
@@ -84,12 +90,21 @@ export async function addProduct(formData: FormData) {
     throw new Error('El nombre y el tipo de producto son obligatorios');
   }
 
+  // Si el usuario deja la frecuencia en blanco, la deduce la IA a partir del
+  // producto. Así no hay que saberse la pauta al registrar cada tratamiento.
+  const frecuenciaManual = leerFrecuenciaDelFormulario(formData);
+  const { frequency_days, frequency_source } = frecuenciaManual !== null
+    ? { frequency_days: frecuenciaManual, frequency_source: 'manual' }
+    : { ...(await deducirFrecuencia(name, type, description)), frequency_source: 'ia' };
+
   const { error } = await supabase.from('products').insert({
     user_id: user.id,
     name,
     type,
     description,
     barcode: barcode || null,
+    frequency_days,
+    frequency_source,
   });
 
   if (error) {
@@ -149,7 +164,11 @@ export async function updatePlant(id: string, formData: FormData) {
 
   if (!name) throw new Error('La especie o el nombre de la planta es obligatorio');
 
-  const updateData: any = { name, species, description, location, size, age, icon_emoji: icon_emoji || null };
+  const updateData: any = {
+    name, species, description, location, size, age,
+    icon_emoji: icon_emoji || null,
+    icon_category: await resolverCategoria(species, name),
+  };
   if (image_url) {
     updateData.image_url = image_url;
   }
@@ -183,7 +202,29 @@ export async function updateProduct(id: string, formData: FormData) {
 
   if (!name || !type) throw new Error('El nombre y tipo son obligatorios');
 
-  await supabase.from('products').update({ name, type, description, barcode: barcode || null }).match({ id, user_id: user.id });
+  const { data: anterior } = await supabase
+    .from('products')
+    .select('frequency_days, frequency_source')
+    .match({ id, user_id: user.id })
+    .single();
+
+  const frecuenciaFormulario = leerFrecuenciaDelFormulario(formData);
+  let frequency_days = frecuenciaFormulario;
+  // Sin valor en el formulario volvemos a preguntar a la IA. Si el valor no ha
+  // cambiado, conservamos su origen: editar el nombre no debe convertir en
+  // "manual" una pauta que puso la IA, ni al revés.
+  let frequency_source = frecuenciaFormulario === null ? 'ia' : 'manual';
+
+  if (frecuenciaFormulario === null) {
+    frequency_days = (await deducirFrecuencia(name, type, description)).frequency_days;
+  } else if (anterior && frecuenciaFormulario === anterior.frequency_days) {
+    frequency_source = anterior.frequency_source || 'manual';
+  }
+
+  await supabase
+    .from('products')
+    .update({ name, type, description, barcode: barcode || null, frequency_days, frequency_source })
+    .match({ id, user_id: user.id });
   
   revalidatePath('/products');
   redirect('/products');
@@ -298,11 +339,8 @@ export async function addEvent(formData: FormData) {
   }
 
   let futureEventsToInsert: any[] = [];
-  let frequencyNotes = '';
 
   if (frequency_days > 0) {
-    frequencyNotes = `[FREQ:${frequency_days}] (Manual)`;
-    
     // Limpiar eventos programados antiguos para esta misma tarea
     let deleteQuery = supabase.from('events').delete()
       .eq('user_id', user.id)
@@ -316,8 +354,7 @@ export async function addEvent(formData: FormData) {
     else deleteQuery = deleteQuery.is('product_id', null);
     
     await deleteQuery;
-    frequencyNotes = `[FREQ:${frequency_days}] (Manual)`;
-    
+
     const latestDateStr = finalDates.sort().reverse()[0];
     const latestDate = new Date(latestDateStr);
     const today = new Date();
@@ -340,7 +377,8 @@ export async function addEvent(formData: FormData) {
         user_id: user.id,
         type,
         date: getLocalDateString(nextDate),
-        notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días. ${frequencyNotes}`,
+        notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días.`,
+        frequency_days,
         plant_id: plant_id || null,
         product_id: product_id || null
       });
@@ -348,13 +386,12 @@ export async function addEvent(formData: FormData) {
     }
   }
 
-  const finalNotes = frequencyNotes ? `${notes ? notes + ' ' : ''}${frequencyNotes}` : notes;
-
   const eventsToInsert = finalDates.map(d => ({
     user_id: user.id,
     type,
     date: d,
-    notes: finalNotes || null,
+    notes: notes || null,
+    frequency_days: frequency_days > 0 ? frequency_days : null,
     plant_id: plant_id || null,
     product_id: product_id || null
   }));
@@ -553,14 +590,8 @@ export async function completeEvent(id: string) {
   
   if (event) {
     let newNotes = event.notes || '';
-    
-    // Extraer la frecuencia si existe antes de limpiar las notas
-    const freqMatch = newNotes.match(/\[FREQ:(\d+)\]/);
-    let frequency_days = 0;
-    if (freqMatch) {
-      frequency_days = parseInt(freqMatch[1], 10);
-    }
-    
+    const frequency_days = leerFrecuencia(event);
+
     newNotes = newNotes.replace(/\[PROGRAMADO\]/g, '').replace(/\[POSPUESTO\]/g, '').trim();
     newNotes = newNotes ? `${newNotes} [HECHO]` : '[HECHO]';
 
@@ -602,7 +633,8 @@ export async function completeEvent(id: string) {
           user_id: user.id,
           type: event.type,
           date: getLocalDateString(nextDate),
-          notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días. [FREQ:${frequency_days}] (Manual)`,
+          notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días.`,
+          frequency_days,
           plant_id: event.plant_id || null,
           product_id: event.product_id || null
         });
@@ -617,4 +649,15 @@ export async function completeEvent(id: string) {
     revalidatePath('/');
     revalidatePath('/calendar');
   }
+}
+
+/**
+ * Lee el campo de frecuencia de un formulario. Devuelve null cuando el usuario
+ * lo deja vacío, que es la señal de "decídela tú".
+ */
+function leerFrecuenciaDelFormulario(formData: FormData): number | null {
+  const bruto = (formData.get('frequency_days') as string | null)?.trim();
+  if (!bruto) return null;
+  const dias = parseInt(bruto, 10);
+  return Number.isFinite(dias) && dias > 0 ? dias : null;
 }

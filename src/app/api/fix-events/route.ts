@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
+import { leerFrecuencia } from '@/lib/frecuencias';
 
 export async function GET() {
   const supabase = await createClient();
@@ -17,12 +18,12 @@ export async function GET() {
   // Extract frequencies from the old programmed events before deleting them
   const frequencies: Record<string, { freq: number, notes: string }> = {}; 
   programmed.forEach(p => {
-    const match = p.notes?.match(/cada (\d+) días/);
-    if (match) {
+    const freq = leerFrecuencia(p);
+    if (freq > 0) {
       const key = `${p.type}-${p.plant_id || 'null'}-${p.product_id || 'null'}`;
       frequencies[key] = {
-        freq: parseInt(match[1]),
-        notes: p.notes!
+        freq,
+        notes: `[PROGRAMADO] Tarea programada cada ${freq} días.`
       };
     }
   });
@@ -70,6 +71,7 @@ export async function GET() {
           type: root.type,
           date: getLocalDateString(nextDate),
           notes: freqData.notes,
+          frequency_days,
           plant_id: root.plant_id,
           product_id: root.product_id
         });

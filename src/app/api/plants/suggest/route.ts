@@ -1,10 +1,6 @@
 import { generateObject } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
-
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY,
-});
+import { modelo } from '@/lib/ai';
 
 export async function GET(req: Request) {
   try {
@@ -16,7 +12,7 @@ export async function GET(req: Request) {
     }
 
     const { object } = await generateObject({
-      model: google('gemini-3.5-flash'),
+      model: modelo(),
       schema: z.object({
         suggestions: z.array(z.string()).max(5).describe('Una lista de hasta 5 nombres científicos y comunes de plantas que coincidan con la búsqueda. Ej: "Monstera deliciosa", "Palmera Phoenix"'),
       }),

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { google } from '@ai-sdk/google';
 import { generateObject } from 'ai';
+import { modelo } from '@/lib/ai';
 import { z } from 'zod';
 
 export async function GET(request: Request) {
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   try {
     const { object } = await generateObject({
-      model: google('gemini-2.5-flash'),
+      model: modelo(),
       schema: z.object({
         suggestions: z.array(z.string())
       }),
