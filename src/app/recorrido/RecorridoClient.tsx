@@ -161,16 +161,63 @@ export default function RecorridoClient({ plantas, parcel }: { plantas: PlantaRe
     }
   };
 
+  // --- Captura inteligente ---------------------------------------------------
+  // Nada de disparar por reloj: cada 1,2 s se toma una miniatura barata del
+  // encuadre y se compara con la anterior (¿está quieta la cámara?) y con la
+  // última analizada (¿es una escena nueva?). Solo cuando te paras delante de
+  // algo nuevo se manda el fotograma a la IA; caminar no gasta análisis.
+  const LADO_MINIATURA = 48;
+  const miniPrevRef = useRef<Uint8ClampedArray | null>(null);
+  const miniAnalizadaRef = useRef<Uint8ClampedArray | null>(null);
+  const ultimoAnalisisRef = useRef(0);
+
+  const miniatura = (video: HTMLVideoElement): Uint8ClampedArray | null => {
+    if (video.videoWidth === 0) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = LADO_MINIATURA;
+    canvas.height = LADO_MINIATURA;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, LADO_MINIATURA, LADO_MINIATURA);
+    const { data } = ctx.getImageData(0, 0, LADO_MINIATURA, LADO_MINIATURA);
+    const gris = new Uint8ClampedArray(LADO_MINIATURA * LADO_MINIATURA);
+    for (let i = 0; i < gris.length; i++) {
+      gris[i] = (data[i * 4] + data[i * 4 + 1] + data[i * 4 + 2]) / 3;
+    }
+    return gris;
+  };
+
+  /** Diferencia media entre dos miniaturas: 0 = idénticas, 1 = opuestas. */
+  const diferencia = (a: Uint8ClampedArray, b: Uint8ClampedArray): number => {
+    let suma = 0;
+    for (let i = 0; i < a.length; i++) suma += Math.abs(a[i] - b[i]);
+    return suma / a.length / 255;
+  };
+
   const capturar = () => {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0 || analizandoRef.current) return;
+    miniAnalizadaRef.current = miniatura(video);
+    ultimoAnalisisRef.current = Date.now();
     analizar(aJpegReducido(video, video.videoWidth, video.videoHeight));
   };
 
-  // Captura automática mientras la cámara está activa.
   useEffect(() => {
     if (fase !== 'camara' || !auto || errorCamara) return;
-    const id = setInterval(capturar, 4500);
+    const id = setInterval(() => {
+      const video = videoRef.current;
+      if (!video) return;
+      const ahora = miniatura(video);
+      if (!ahora) return;
+      const antes = miniPrevRef.current;
+      miniPrevRef.current = ahora;
+      if (!antes || analizandoRef.current) return;
+
+      const estable = diferencia(ahora, antes) < 0.04;
+      const escenaNueva = !miniAnalizadaRef.current || diferencia(ahora, miniAnalizadaRef.current) > 0.12;
+      const conMargen = Date.now() - ultimoAnalisisRef.current > 4000;
+      if (estable && escenaNueva && conMargen) capturar();
+    }, 1200);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase, auto, errorCamara]);
@@ -266,7 +313,7 @@ export default function RecorridoClient({ plantas, parcel }: { plantas: PlantaRe
           <p className="field-label" style={{ marginBottom: '10px', display: 'block' }}>Cómo funciona</p>
           <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: 'var(--color-slate-smoke)', lineHeight: 1.7 }}>
             <li>Acepta los permisos de <strong>cámara</strong> y <strong>ubicación</strong> (la posición GPS es el borrador para colocar cada planta).</li>
-            <li>Camina despacio y detente 2–3 segundos delante de cada planta: la captura es automática.</li>
+            <li>Párate 2–3 segundos delante de cada planta: la cámara dispara sola cuando ve una escena nueva y estable. Caminar no gasta análisis.</li>
             <li>Al terminar, revisa la lista: corrige nombres, repite la foto de las dudosas y ajusta los pins en el mapa.</li>
           </ol>
         </div>

@@ -142,43 +142,52 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
     return dateStr;
   };
 
+  /**
+   * Desmenuza las notas del evento. Las etiquetas de estado y la frase
+   * repetitiva "Tarea programada cada N días (aplicación X). Revisar hasta: Y."
+   * se convierten en datos; el texto que queda es lo que escribió el usuario.
+   */
   const parseReason = (reason: string, frequencyDays?: number | null) => {
-    const tags: { text: string, className: string }[] = [];
-    let cleanText = reason;
+    let texto = reason;
 
-    if (cleanText.includes('[PROGRAMADO]')) {
-      tags.push({ text: 'PROGRAMADO', className: 'tag' });
-      cleanText = cleanText.replace(/\[PROGRAMADO\]/g, '');
-    }
-    if (cleanText.includes('[POSPUESTO]')) {
-      tags.push({ text: 'POSPUESTO', className: 'tag tag--muted' });
-      cleanText = cleanText.replace(/\[POSPUESTO\]/g, '');
-    }
-    if (cleanText.includes('[HECHO]')) {
-      tags.push({ text: 'HECHO', className: 'tag tag--fern' });
-      cleanText = cleanText.replace(/\[HECHO\]/g, '');
-    }
-    if (cleanText.includes('[FIN]')) {
-      tags.push({ text: 'TERMINADO', className: 'tag tag--muted' });
-      cleanText = cleanText.replace(/\[FIN\]/g, '');
-    }
+    const pospuesto = texto.includes('[POSPUESTO]');
+    const hecho = texto.includes('[HECHO]');
+    const fin = texto.includes('[FIN]');
+    texto = texto.replace(/\[(PROGRAMADO|POSPUESTO|HECHO|FIN)\]/g, '');
 
-    // La frecuencia viene de la columna del evento. Los eventos antiguos la
-    // llevan escrita en el propio texto como "[FREQ:15] (Manual)": se lee de ahí
-    // como respaldo y se limpia para que no salga en pantalla.
-    const etiquetaAntigua = cleanText.match(/\[FREQ:(\d+)\]/);
+    // La frecuencia viene de la columna del evento; los antiguos la llevaban
+    // escrita como "[FREQ:15]" y se lee de ahí como respaldo.
+    const etiquetaAntigua = texto.match(/\[FREQ:(\d+)\]/);
     const dias = frequencyDays || (etiquetaAntigua ? parseInt(etiquetaAntigua[1], 10) : 0);
-    if (dias > 0) {
-      tags.push({ text: `CADA ${dias} DÍAS`, className: 'tag tag--fern' });
-    }
-    cleanText = cleanText
+
+    const metodo = texto.match(/\(aplicación ([^)]+)\)/)?.[1] || null;
+    const hasta = texto.match(/Revisar hasta: (.+?)\.(?:\s|$)/)?.[1] || null;
+
+    texto = texto
       .replace(/\[FREQ:\d+\]/g, '')
+      .replace(/Tarea programada cada \d+ días(\s*\(aplicación [^)]+\))?\./g, '')
+      .replace(/\(aplicación [^)]+\)/g, '')
+      .replace(/Revisar hasta: .+?\.(?=\s|$)/g, '')
       .replace(/\(Manual\)/g, '')
       .replace(/\(\)/g, '')
       .trim();
 
-    return { cleanText, tags };
+    return { texto, dias, metodo, hasta, pospuesto, hecho, fin };
   };
+
+  const tituloDe = (item) => {
+    const actionName = item.product_name ? item.product_name : item.type;
+    if (item.plant_name && item.plant_name !== 'General') {
+      return `${actionName} en ${item.plant_name}`;
+    }
+    return item.product_name ? `Aplicación de ${actionName}` : `Tratamiento de ${actionName}`;
+  };
+
+  const enlace = {
+    fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em',
+    textTransform: 'uppercase', color: 'var(--color-deep-fern)', textDecoration: 'none',
+    background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  } as const;
 
   const renderList = () => {
     const combinedList = [
@@ -190,12 +199,11 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
         product_id: e.product_id,
         plant_name: e.plants?.name || e.plants?.species || 'General',
         product_name: e.products?.name || '',
-        reason: e.notes || (e.date <= todayStr ? 'Tratamiento completado y registrado.' : 'Tarea pendiente de realizar.'),
+        reason: e.notes || '',
         frequency_days: e.frequency_days,
         date: e.date,
         urgency: e.date <= todayStr ? (e.date < todayStr ? 'alta' : 'media') : 'baja',
         isPast: e.notes?.includes('[HECHO]') || (e.date < todayStr && !e.notes?.includes('[PROGRAMADO]')),
-        isScheduled: e.date > todayStr && !e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'),
         isSuggestion: e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')
       }))
     ];
@@ -213,149 +221,139 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
     if (combinedList.length === 0) {
       return (
         <div className="card" style={{ textAlign: 'center' }}>
-          <p className="body-text" style={{ margin: '0 auto', fontSize: '13px' }}>No hay tareas pendientes ni historial. ¡Añade tu primer tratamiento!</p>
+          <p className="body-text" style={{ margin: '0 auto', fontSize: '13px' }}>
+            Nada en la agenda todavía. Registra un tratamiento con «+ Añadir» y aquí
+            aparecerán los próximos avisos.
+          </p>
         </div>
       );
     }
 
+    const pendientes = combinedList.filter(i => !i.isPast);
+    const historial = combinedList.filter(i => i.isPast);
+
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {combinedList.map((item, idx: number) => {
-          const isUrgent = item.urgency === 'alta' && !item.isPast;
-          const isToday = item.urgency === 'media' && !item.isPast;
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {pendientes.map((item, idx) => {
+          const isUrgent = item.urgency === 'alta';
+          const isToday = item.urgency === 'media';
+          const info = parseReason(item.reason, item.frequency_days);
 
-          // Un solo acento cromático: terracota para lo atrasado. El resto de
-          // estados se dice en la familia verde-salvia.
-          let borderColor = 'var(--color-muted-sage)';
-          if (item.isPast) {
-            borderColor = 'var(--color-lichen)';
-          } else if (isUrgent) {
-            borderColor = 'var(--color-alert)';
-          } else if (isToday) {
-            borderColor = 'var(--color-deep-fern)';
-          }
-
-          const typeTagClass = item.isPast
-            ? 'tag tag--muted'
-            : (isUrgent ? 'tag tag--alert' : (isToday ? 'tag tag--ink' : 'tag'));
-
-          const { cleanText, tags } = parseReason(item.reason, (item as { frequency_days?: number | null }).frequency_days);
+          const borde = isUrgent ? 'var(--color-alert)' : (isToday ? 'var(--color-deep-fern)' : 'var(--color-muted-sage)');
+          const meta = [
+            info.dias > 0 ? `cada ${info.dias} días` : null,
+            info.metodo ? `aplicación ${info.metodo}` : null,
+            info.hasta ? `hasta: ${info.hasta}` : null,
+          ].filter(Boolean).join(' · ');
 
           return (
-            <div key={idx} className="card" style={{
-              borderLeft: `3px solid ${borderColor}`,
-              opacity: item.isPast ? 0.75 : 1,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-              gap: '10px',
-              padding: '14px 16px'
-            }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  <span className={typeTagClass}>
-                    {item.isPast ? `✓ ${item.type}` : item.type}
-                  </span>
+            <div key={item.id || idx} className="card" style={{ borderLeft: `3px solid ${borde}`, padding: '13px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', marginBottom: '7px' }}>
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className="tag">{item.type}</span>
                   {isUrgent && <span className="tag tag--alert">Atrasado</span>}
                   {isToday && <span className="tag tag--fern">Hoy</span>}
-                  {item.isPast && <span className="tag tag--muted">Registro</span>}
+                  {info.pospuesto && <span className="tag tag--muted">Pospuesto</span>}
                 </div>
-
-                <h3 className="suisse" style={{ fontSize: '15px', margin: '0 0 6px 0', color: item.isPast ? 'var(--color-slate-smoke)' : 'var(--color-forest-ink)', textDecoration: item.isPast ? 'line-through' : 'none' }}>
-                  {(() => {
-                    const actionName = item.product_name ? item.product_name : item.type;
-                    if (item.plant_name && item.plant_name !== 'General') {
-                      return `${actionName} en ${item.plant_name}`;
-                    } else {
-                      return item.product_name ? `Aplicación de ${actionName}` : `Tratamiento de ${actionName}`;
-                    }
-                  })()}
-                </h3>
-
-                {cleanText && (
-                  <p className="body-text" style={{ fontSize: '12px', marginBottom: '8px', lineHeight: '1.45' }}>{cleanText}</p>
-                )}
-
-                {tags.length > 0 && (
-                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                    {tags.map((tag, i) => (
-                      <span key={i} className={tag.className}>{tag.text}</span>
-                    ))}
-                  </div>
-                )}
-
-                {!item.isPast && item.product_name && (
-                  <div style={{ fontSize: '12px', color: 'var(--color-slate-smoke)' }}>
-                    <strong style={{ color: 'var(--color-forest-ink)', fontWeight: 500 }}>Usar:</strong> {item.product_name}
-                  </div>
-                )}
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 500, whiteSpace: 'nowrap', color: isUrgent ? 'var(--color-alert)' : 'var(--color-forest-ink)' }}>
+                  {formatEuropeanDate(item.date)}
+                </span>
               </div>
 
-              <div style={{ textAlign: 'right', flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                <div>
-                  <span className="field-label" style={{ display: 'block', fontSize: '9px', marginBottom: '2px' }}>{item.isPast ? 'Registro' : 'Fecha'}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: item.isPast ? 'var(--color-slate-smoke)' : (isUrgent ? 'var(--color-alert)' : 'var(--color-forest-ink)'), fontWeight: 500 }}>{formatEuropeanDate(item.date)}</span>
-                </div>
+              <h3 className="suisse" style={{ fontSize: '15px', margin: '0 0 3px 0' }}>{tituloDe(item)}</h3>
+              {meta && (
+                <p style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--color-slate-smoke)', margin: '0 0 4px 0', lineHeight: 1.5 }}>{meta}</p>
+              )}
+              {info.texto && (
+                <p className="body-text" style={{ fontSize: '12px', margin: '0 0 4px 0', lineHeight: 1.45 }}>{info.texto}</p>
+              )}
 
-                <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
-                  {!item.isPast && item.id && (item.isSuggestion || item.urgency === 'alta' || item.urgency === 'media') && (
+              {item.id && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '9px' }}>
+                  <div style={{ display: 'flex', gap: '14px' }}>
+                    <a href={`/calendar/${item.id}/edit`} style={enlace}>[ Editar ]</a>
+                    {item.isSuggestion && (
+                      <button
+                        style={{ ...enlace, color: 'var(--color-slate-smoke)' }}
+                        disabled={isPending}
+                        onClick={() => {
+                          if (!window.confirm('¿Dar por terminado este tratamiento? Se eliminan sus próximos avisos programados; el historial se conserva.')) return;
+                          startTransition(async () => {
+                            const { terminarTratamiento } = await import('@/app/actions');
+                            await terminarTratamiento(item.id);
+                          });
+                        }}
+                      >
+                        [ Terminar ]
+                      </button>
+                    )}
+                  </div>
+                  {(item.isSuggestion || isUrgent || isToday) && (
                     <div style={{ display: 'flex', gap: '5px' }}>
                       <button
+                        className="chip-btn"
+                        disabled={isPending}
                         onClick={() => {
                           startTransition(async () => {
                             const { postponeEvent } = await import('@/app/actions');
                             await postponeEvent(item.id);
                           });
                         }}
-                        className="chip-btn"
-                        disabled={isPending}
                       >
-                        +1 Posponer
+                        +1 día
                       </button>
                       <button
+                        className="chip-btn chip-btn--primary"
+                        disabled={isPending}
                         onClick={() => {
                           startTransition(async () => {
                             const { completeEvent } = await import('@/app/actions');
                             await completeEvent(item.id);
                           });
                         }}
-                        className="chip-btn chip-btn--primary"
-                        disabled={isPending}
                       >
                         ✓ Hecho
                       </button>
                     </div>
                   )}
-                  {!item.isPast && item.id && item.isSuggestion && (
-                    <button
-                      onClick={() => {
-                        if (!window.confirm('¿Dar por terminado este tratamiento? Se eliminan sus próximos avisos programados; el historial se conserva.')) return;
-                        startTransition(async () => {
-                          const { terminarTratamiento } = await import('@/app/actions');
-                          await terminarTratamiento(item.id);
-                        });
-                      }}
-                      className="chip-btn"
-                      disabled={isPending}
-                    >
-                      Terminar tratamiento
-                    </button>
-                  )}
-                  {item.id && (
-                    <a href={`/calendar/${item.id}/edit`} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-deep-fern)', textDecoration: 'none' }}>
-                      [ Editar ]
-                    </a>
-                  )}
                 </div>
-              </div>
+              )}
             </div>
           );
         })}
+
+        {historial.length > 0 && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0 0' }}>
+              <span className="field-label" style={{ fontSize: '10px' }}>[ Historial ]</span>
+              <div className="hairline" style={{ flex: 1, width: 'auto' }} />
+            </div>
+            <div>
+              {historial.map((item, idx) => {
+                const info = parseReason(item.reason, item.frequency_days);
+                return (
+                  <div key={item.id || `h${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 2px', borderBottom: '1px solid var(--color-ash-gray)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--color-slate-smoke)', flex: '0 0 auto' }}>
+                      {formatEuropeanDate(item.date)}
+                    </span>
+                    <span style={{ fontSize: '13px', color: 'var(--color-slate-smoke)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={info.texto || undefined}>
+                      {tituloDe(item)}
+                    </span>
+                    {info.fin && <span className="tag tag--muted">Fin</span>}
+                    {item.id && <a href={`/calendar/${item.id}/edit`} style={{ ...enlace, fontSize: '11px' }} aria-label="Editar registro">✎</a>}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     );
   };
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
         <div style={{ display: 'flex', backgroundColor: 'var(--color-ash-gray)', borderRadius: '10px', padding: '3px', border: '1px solid var(--color-lichen)' }}>
           {(['list', 'grid'] as const).map(v => (
             <button

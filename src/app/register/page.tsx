@@ -37,7 +37,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
 
           <div style={{ marginTop: '15px' }}>
             <button formAction={signup} className="btn-filled" style={{ width: '100%', justifyContent: 'center' }}>
-              REGISTRARSE
+              Crear la cuenta
             </button>
           </div>
         </form>

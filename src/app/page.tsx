@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import SmartCalendar from '@/app/calendar/SmartCalendar';
 import ChatWidget from '@/components/ChatWidget';
-import ClearEventsButton from './ClearEventsButton';
 import RecalcularPautasButton from './RecalcularPautasButton';
 
 export default async function HomePage() {
@@ -42,7 +41,7 @@ export default async function HomePage() {
         <Link
           href="/recorrido"
           className="chip-btn chip-btn--primary"
-          style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 1000, boxShadow: '0 2px 8px rgba(9,53,46,0.25)' }}
+          style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 1000, boxShadow: '0 2px 8px rgba(9,53,46,0.25)' }}
         >
           ◉ Recorrido
         </Link>
@@ -52,10 +51,9 @@ export default async function HomePage() {
       {user && (
         <div className="home-panel">
           <div className="home-panel-head">
-            <h3 className="home-panel-title">[ Agenda y registro ]</h3>
+            <h3 className="home-panel-title">[ Agenda ]</h3>
             <div style={{ display: 'flex', gap: '6px' }}>
               <RecalcularPautasButton />
-              <ClearEventsButton />
               <Link href="/calendar/new" className="chip-btn chip-btn--primary">+ Añadir</Link>
             </div>
           </div>

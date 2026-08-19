@@ -46,7 +46,6 @@ export default async function RootLayout({
             <span>brotes</span>
           </Link>
           <div className="topbar-links">
-            <Link href="/" className="topbar-link">Inicio</Link>
             <Link href="/plants" className="topbar-link">Plantas</Link>
             <Link href="/products" className="topbar-link">Inventario</Link>
             <Link href="/settings" className="topbar-link">Ajustes</Link>

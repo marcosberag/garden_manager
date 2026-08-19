@@ -5,6 +5,7 @@ import { addContact, deleteContact } from './actions';
 
 import TestWhatsAppButton from './TestWhatsAppButton';
 import RunCronButton from './RunCronButton';
+import ClearEventsButton from '@/app/ClearEventsButton';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -17,14 +18,14 @@ export default async function SettingsPage() {
     <main className="container" style={{ paddingTop: '120px', paddingBottom: '120px' }}>
       
       <section className="section">
-        <div style={{ display: 'flex', gap: '45px', alignItems: 'flex-start' }}>
-          <div style={{ flex: '0 0 auto', paddingTop: '15px' }}>
-            <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>
+        <div className="labeled-section">
+          <div className="labeled-section-tag">
+            <span className="field-label">
               ajustes
             </span>
           </div>
           
-          <div style={{ flex: '1' }}>
+          <div className="labeled-section-body">
             <h1 className="heading-text suisse" style={{ color: 'var(--color-ink-black)', marginBottom: '30px' }}>
               el altavoz<br/>
               del jardín.
@@ -79,7 +80,16 @@ export default async function SettingsPage() {
             </div>
             
             <RunCronButton />
-            
+
+            <div className="card" style={{ marginTop: '24px', borderLeft: '3px solid var(--color-alert)' }}>
+              <p className="eyebrow" style={{ color: 'var(--color-alert)', marginBottom: '8px' }}>Zona delicada</p>
+              <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: 'var(--color-slate-smoke)' }}>
+                Borra todos los eventos de la agenda: registros, historial y avisos programados.
+                No se puede deshacer.
+              </p>
+              <ClearEventsButton />
+            </div>
+
           </div>
         </div>
       </section>

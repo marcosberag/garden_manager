@@ -37,7 +37,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
           <div style={{ marginTop: '15px' }}>
             <button formAction={login} className="btn-filled" style={{ width: '100%', justifyContent: 'center' }}>
-              ACCEDER
+              Acceder
             </button>
           </div>
         </form>

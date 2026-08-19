@@ -612,11 +612,38 @@ textarea.input-field {
   }
 }
 
+/* Sección con rótulo lateral (colección, inventario, ajustes...). En escritorio
+   el rótulo acompaña en columna propia; en móvil sube como cejilla. */
+.labeled-section {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.labeled-section > .labeled-section-tag {
+  flex: 0 0 auto;
+  padding-top: 6px;
+}
+
+.labeled-section > .labeled-section-body {
+  flex: 1;
+  min-width: 0;
+}
+
 @media (max-width: 768px) {
   :root {
     --text-heading: 26px;
     --text-display: 34px;
     --section-gap: 32px;
+  }
+
+  .labeled-section {
+    display: block;
+  }
+
+  .labeled-section > .labeled-section-tag {
+    padding-top: 0;
+    margin-bottom: 10px;
   }
 
   .container {

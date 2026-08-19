@@ -31,14 +31,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <main className="container" style={{ paddingTop: '120px', paddingBottom: '120px' }}>
       <section className="section">
-        <div style={{ display: 'flex', gap: '45px', alignItems: 'flex-start' }}>
-          <div style={{ flex: '0 0 auto', paddingTop: '15px' }}>
-            <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>
+        <div className="labeled-section">
+          <div className="labeled-section-tag">
+            <span className="field-label">
               inventario
             </span>
           </div>
           
-          <div style={{ flex: '1', maxWidth: '600px' }}>
+          <div className="labeled-section-body" style={{ maxWidth: '600px' }}>
             <Link href="/products" style={{ display: 'inline-block', marginBottom: '20px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)', textDecoration: 'none' }}>
               &larr; Volver a Inventario
             </Link>

@@ -24,7 +24,7 @@ export default function ClearEventsButton() {
         disabled={loading}
         className="chip-btn chip-btn--danger"
       >
-        {loading ? 'Borrando…' : 'Limpiar'}
+        {loading ? 'Borrando…' : 'Borrar todo el calendario'}
       </button>
 
       {showConfirm && (

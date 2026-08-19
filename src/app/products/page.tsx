@@ -14,14 +14,14 @@ export default async function ProductsPage() {
     <main className="container" style={{ paddingTop: '120px', paddingBottom: '120px' }}>
       
       <section className="section">
-        <div style={{ display: 'flex', gap: '45px', alignItems: 'flex-start' }}>
-          <div style={{ flex: '0 0 auto', paddingTop: '15px' }}>
-            <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>
+        <div className="labeled-section">
+          <div className="labeled-section-tag">
+            <span className="field-label">
               inventario
             </span>
           </div>
           
-          <div style={{ flex: '1' }}>
+          <div className="labeled-section-body">
             <h1 className="heading-text suisse" style={{ color: 'var(--color-ink-black)', marginBottom: '30px' }}>
               el armario de<br/>
               suministros.
@@ -41,7 +41,7 @@ export default async function ProductsPage() {
                   <hr className="hairline graphite" style={{ margin: '23px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Link href={`/products/${product.id}`} className="btn-ghost" style={{ padding: '8px 15px', fontSize: '12px', textDecoration: 'none' }}>
-                      VER DETALLES <span>&rarr;</span>
+                      Ver detalles <span>&rarr;</span>
                     </Link>
                     <ProductActions id={product.id} />
                   </div>
@@ -55,7 +55,7 @@ export default async function ProductsPage() {
             
             <div style={{ marginTop: '75px' }}>
               <Link href="/products/new" className="btn-ghost" style={{ borderColor: 'var(--color-ink-black)', display: 'inline-block', textDecoration: 'none' }}>
-                AÑADIR PRODUCTO <span>&rarr;&rarr;</span>
+                Añadir producto <span>&rarr;</span>
               </Link>
             </div>
           </div>

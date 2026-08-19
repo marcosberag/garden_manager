@@ -15,14 +15,14 @@ export default async function PlantsPage() {
     <main className="container" style={{ paddingTop: '120px', paddingBottom: '120px' }}>
       
       <section className="section">
-        <div style={{ display: 'flex', gap: '45px', alignItems: 'flex-start' }}>
-          <div style={{ flex: '0 0 auto', paddingTop: '15px' }}>
-            <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>
+        <div className="labeled-section">
+          <div className="labeled-section-tag">
+            <span className="field-label">
               colección
             </span>
           </div>
           
-          <div style={{ flex: '1' }}>
+          <div className="labeled-section-body">
             <h1 className="heading-text suisse" style={{ color: 'var(--color-ink-black)', marginBottom: '30px' }}>
               tus plantas.
             </h1>
@@ -46,7 +46,7 @@ export default async function PlantsPage() {
                   <hr className="hairline graphite" style={{ margin: '23px 0' }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Link href={`/plants/${plant.id}`} className="btn-ghost" style={{ padding: '8px 15px', fontSize: '12px', textDecoration: 'none' }}>
-                      VER FICHA <span>&rarr;</span>
+                      Ver ficha <span>&rarr;</span>
                     </Link>
                     <PlantActions id={plant.id} />
                   </div>
