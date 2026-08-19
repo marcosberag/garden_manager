@@ -98,10 +98,12 @@ export function leerFrecuencia(evento: EventoConFrecuencia): number {
 }
 
 export type CasoTratamiento = {
-  producto: { nombre: string; tipo?: string | null; descripcion?: string | null };
+  producto: { nombre: string; tipo?: string | null; descripcion?: string | null; dosis?: string | null };
   planta?: { nombre?: string | null; especie?: string | null } | null;
   metodo?: string | null;
   notas?: string | null;
+  /** Dimensión real de lo tratado: metros del seto medidos en el mapa, o tamaño anotado. */
+  dimension?: { metros?: number | null; tamano?: string | null } | null;
 };
 
 export type FrecuenciaDelCaso = {
@@ -111,6 +113,10 @@ export type FrecuenciaDelCaso = {
   motivo: string;
   /** Hasta cuándo mantener las aplicaciones: época o condición de parada. */
   hasta: string | null;
+  /** Dosis y caldo total si se puede calcular. Ej: "3 ml/L — unos 8 L de caldo para tus 18 m de seto". */
+  dosis: string | null;
+  /** De dónde sale la dosis: 'producto' (apuntada por el usuario), 'etiqueta' o 'general'. */
+  dosis_fuente: 'producto' | 'etiqueta' | 'general' | null;
 };
 
 // Valores del selector de modo de aplicación del formulario de tratamiento.
@@ -135,8 +141,14 @@ export function textoDeMetodo(metodo?: string | null): string | null {
 export async function frecuenciaSegunCaso(caso: CasoTratamiento): Promise<FrecuenciaDelCaso | null> {
   const lineas = [`- Producto: "${caso.producto.nombre}"${caso.producto.tipo ? ` (${caso.producto.tipo})` : ''}`];
   if (caso.producto.descripcion) lineas.push(`- Notas del producto: "${caso.producto.descripcion}"`);
+  if (caso.producto.dosis?.trim()) lineas.push(`- Dosis apuntada en el producto (manda sobre cualquier otra fuente): "${caso.producto.dosis.trim()}"`);
   const planta = [caso.planta?.nombre, caso.planta?.especie].filter(Boolean).join(', ');
   if (planta) lineas.push(`- Planta tratada: ${planta}`);
+  if (caso.dimension?.metros && caso.dimension.metros > 0) {
+    lineas.push(`- Dimensión medida en el mapa: un seto/hilera de ${caso.dimension.metros.toFixed(0)} m de largo`);
+  } else if (caso.dimension?.tamano?.trim()) {
+    lineas.push(`- Tamaño anotado de la planta: "${caso.dimension.tamano.trim()}"`);
+  }
   const metodo = textoDeMetodo(caso.metodo);
   if (metodo) lineas.push(`- Modo de aplicación: ${metodo}`);
   if (caso.notas?.trim()) lineas.push(`- Notas del usuario sobre este tratamiento: "${caso.notas.trim()}"`);
@@ -150,6 +162,8 @@ export async function frecuenciaSegunCaso(caso: CasoTratamiento): Promise<Frecue
         max_days: z.number().describe('Límite superior del rango habitual de la pauta, en días. 0 si no hay rango.'),
         motivo: z.string().describe('Una o dos frases en español justificando la pauta para este caso: modo de aplicación, especie y severidad si se conocen. Sin repetir el nombre del producto.'),
         hasta: z.string().describe('Hasta cuándo mantener las aplicaciones, en pocas palabras: una condición de parada o época del año. Ej: "mientras haya síntomas", "hasta finales de octubre", "solo con humedad alta". Cadena vacía si de verdad no hay límite.'),
+        dosis: z.string().describe('La dosis para este caso, corta y práctica. Si se conoce la dimensión, incluye el caldo total aproximado. Ej: "3 ml/L — prepara unos 8 L de caldo para los 18 m de seto". Cadena vacía si no se puede dar una dosis fiable.'),
+        dosis_fuente: z.enum(['producto', 'etiqueta', 'general', 'ninguna']).describe('De dónde sale la dosis: "producto" si viene de la dosis apuntada en el producto, "etiqueta" si aparece en las notas/etiqueta del producto, "general" si es conocimiento agronómico general, "ninguna" si no hay dosis.'),
       }),
       prompt: `Eres un ingeniero agrónomo. Un usuario va a registrar este tratamiento en su jardín doméstico:
 ${lineas.join('\n')}
@@ -160,7 +174,14 @@ Indica cada cuántos días conviene repetirlo EN ESTE CASO CONCRETO, no la pauta
 - Si las notas indican severidad ("hay bastante", "muy avanzado"...), acorta hacia el mínimo del rango habitual; si es un uso preventivo, alarga hacia el máximo.
 Devuelve también el rango habitual (mínimo y máximo en días) para que el usuario pueda ajustar con criterio,
 y hasta cuándo mantener las aplicaciones: los tratamientos no son para siempre. Indica la condición de parada
-o la época del año en que dejan de tener sentido (fin de la temporada del hongo, desaparición de síntomas...).`,
+o la época del año en que dejan de tener sentido (fin de la temporada del hongo, desaparición de síntomas...).
+
+Da también la DOSIS, con esta prioridad estricta de fuentes:
+1. La dosis apuntada en el producto (a veces la dio el vivero y no viene en el envase): si existe, es LA dosis.
+2. La que aparezca en las notas/etiqueta del producto.
+3. Solo si no hay nada de lo anterior, tu conocimiento general — y en ese caso sé conservador.
+Si conoces la dimensión (metros de seto, tamaño), calcula el caldo total aproximado para esa dimensión.
+No inventes dosis para productos comerciales que no conozcas: mejor cadena vacía que una dosis errónea.`,
       temperature: 0.2,
     });
 
@@ -172,12 +193,15 @@ o la época del año en que dejan de tener sentido (fin de la temporada del hong
     // El rango solo se enseña si es coherente con la recomendación.
     const rangoValido = min >= MIN_DIAS && max <= MAX_DIAS && min <= dias && dias <= max && min < max;
 
+    const dosis = object.dosis?.trim() || null;
     return {
       frequency_days: dias,
       min_days: rangoValido ? min : null,
       max_days: rangoValido ? max : null,
       motivo: object.motivo,
       hasta: object.hasta?.trim() || null,
+      dosis,
+      dosis_fuente: dosis && object.dosis_fuente !== 'ninguna' ? object.dosis_fuente : null,
     };
   } catch (error) {
     console.error('[frecuencias] Fallo calculando la pauta del caso, se mantiene la del producto:', error);

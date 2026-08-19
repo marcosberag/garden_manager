@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createClient as createServerClient } from '@/utils/supabase/server';
 import { createClient as createStandardClient } from '@supabase/supabase-js';
 import { enviarWhatsApp } from '@/lib/callmebot';
+import { parteNocturnoFumigacion, centroDeGeojson } from '@/lib/meteo';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,6 +139,28 @@ export async function GET(request: NextRequest) {
           msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
         });
         msgLines.push('');
+      }
+    }
+
+    // El parte de la noche: aquí se fumiga de noche, así que lo que decide es
+    // la lluvia y el viento de esta noche y la madrugada, no el sol de mediodía.
+    if (todayEvents.length > 0 || tomorrowEvents.length > 0) {
+      try {
+        const { data: parcelas } = await supabase.from('parcels').select('geojson').limit(1);
+        let coords = centroDeGeojson(parcelas?.[0]?.geojson);
+        if (!coords) {
+          const { data: conPos } = await supabase.from('plants').select('lat, lng').not('lat', 'is', null).limit(1);
+          if (conPos?.[0]?.lat != null) coords = { lat: conPos[0].lat, lng: conPos[0].lng };
+        }
+        if (coords) {
+          const parte = await parteNocturnoFumigacion(coords.lat, coords.lng);
+          if (parte) {
+            msgLines.push(parte.resumen);
+            msgLines.push('');
+          }
+        }
+      } catch (e) {
+        console.error('[cron/whatsapp] Parte meteorológico no disponible:', e);
       }
     }
 

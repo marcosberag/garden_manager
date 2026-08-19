@@ -6,6 +6,7 @@ import { addContact, deleteContact } from './actions';
 import TestWhatsAppButton from './TestWhatsAppButton';
 import RunCronButton from './RunCronButton';
 import ClearEventsButton from '@/app/ClearEventsButton';
+import PlanAnual from './PlanAnual';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -80,6 +81,8 @@ export default async function SettingsPage() {
             </div>
             
             <RunCronButton />
+
+            <PlanAnual />
 
             <div className="card" style={{ marginTop: '24px', borderLeft: '3px solid var(--color-alert)' }}>
               <p className="eyebrow" style={{ color: 'var(--color-alert)', marginBottom: '8px' }}>Zona delicada</p>

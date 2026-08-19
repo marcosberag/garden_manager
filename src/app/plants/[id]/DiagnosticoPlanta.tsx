@@ -5,7 +5,17 @@ import Link from 'next/link';
 import { IconoCamara, IconoGaleria } from '@/components/ScanIcons';
 import type { Diagnostico } from '@/lib/diagnosticar-planta';
 
-type Resultado = Diagnostico & { producto_id: string | null };
+type Resultado = Diagnostico & {
+  producto_id: string | null;
+  evolucion?: 'mejora' | 'igual' | 'empeora' | null;
+  veredicto_evolucion?: string | null;
+};
+
+const ETIQUETA_EVOLUCION: Record<string, { texto: string; clase: string }> = {
+  mejora: { texto: 'Mejorando', clase: 'tag tag--fern' },
+  igual: { texto: 'Sin cambios', clase: 'tag tag--muted' },
+  empeora: { texto: 'Empeorando', clase: 'tag tag--alert' },
+};
 
 const ETIQUETA_METODO: Record<string, string> = {
   foliar: 'foliar, pulverizando las hojas',
@@ -100,6 +110,22 @@ export default function DiagnosticoPlanta({ plantId }: { plantId: string }) {
           <p style={{ fontSize: '13px', color: 'var(--color-slate-smoke)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
             {resultado.descripcion}
           </p>
+
+          {resultado.veredicto_evolucion && (
+            <div style={{ backgroundColor: 'var(--color-ash-gray)', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
+                <p className="eyebrow" style={{ margin: 0 }}>Evolución desde la última foto</p>
+                {resultado.evolucion && ETIQUETA_EVOLUCION[resultado.evolucion] && (
+                  <span className={ETIQUETA_EVOLUCION[resultado.evolucion].clase}>
+                    {ETIQUETA_EVOLUCION[resultado.evolucion].texto}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.5, color: 'var(--color-forest-ink)' }}>
+                {resultado.veredicto_evolucion}
+              </p>
+            </div>
+          )}
 
           <div style={{ backgroundColor: 'var(--color-ash-gray)', borderRadius: '8px', padding: '12px 14px' }}>
             <p className="eyebrow" style={{ marginBottom: '6px' }}>Tratamiento recomendado</p>

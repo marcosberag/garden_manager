@@ -11,6 +11,7 @@ type Defaults = {
   description?: string | null;
   frequency_days?: number | null;
   barcode?: string | null;
+  dosage?: string | null;
 };
 
 /**
@@ -27,6 +28,7 @@ export default function ProductForm({ action, defaults, textoBoton }: {
   const [tipo, setTipo] = useState(defaults?.type || '');
   const [descripcion, setDescripcion] = useState(defaults?.description || '');
   const [frecuencia, setFrecuencia] = useState(defaults?.frequency_days ? String(defaults.frequency_days) : '');
+  const [dosis, setDosis] = useState(defaults?.dosage || '');
   const [lectura, setLectura] = useState<string | null>(null);
 
   const handleIdentificado = (p: ProductoIdentificado) => {
@@ -34,6 +36,7 @@ export default function ProductForm({ action, defaults, textoBoton }: {
     setTipo(p.type);
     setDescripcion(p.description);
     if (p.frequency_days) setFrecuencia(String(p.frequency_days));
+    if (p.dosage) setDosis(p.dosage);
     setLectura(p.frequency_days
       ? `${p.name}. Pauta: cada ${p.frequency_days} días. ${p.motivo || ''}`.trim()
       : `${p.name}. La pauta no se lee en la etiqueta: se calculará al guardar.`);
@@ -116,6 +119,23 @@ export default function ProductForm({ action, defaults, textoBoton }: {
         <p className="field-hint">
           Propone la repetición al registrar un tratamiento con este producto. Si cambia,
           los avisos ya programados se reprograman solos. Vacío, se calcula al guardar.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <label htmlFor="dosage" className="field-label">Dosis (opcional)</label>
+        <input
+          type="text"
+          id="dosage"
+          name="dosage"
+          placeholder="Ej: 3 ml por litro de agua"
+          value={dosis}
+          onChange={(e) => setDosis(e.target.value)}
+          className="input-field"
+        />
+        <p className="field-hint">
+          Si la sabes — de la etiqueta o porque te la dijo el vivero — apúntala:
+          mandará sobre lo que calcule la IA al preparar el caldo.
         </p>
       </div>
 

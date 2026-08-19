@@ -20,6 +20,7 @@ export type ProductoIdentificado = {
   description: string;
   frequency_days: number | null;
   motivo: string | null;
+  dosage: string | null;
 };
 
 /**
@@ -38,6 +39,7 @@ export async function identificarProducto(base64Image: string): Promise<Producto
       description: z.string().describe('Una o dos frases en español: materia activa o composición y para qué sirve, según la etiqueta.'),
       frequency_days: z.number().describe('Cada cuántos días se aplica. Prioridad: la pauta que indique la propia etiqueta; si no se lee, la habitual del producto. 0 si no es de aplicación periódica o no se puede saber.'),
       motivo: z.string().describe('Una frase en español explicando de dónde sale la pauta (de la etiqueta o del uso habitual).'),
+      dosage: z.string().describe('La dosis tal como la indique la etiqueta, corta. Ej: "3 ml/L", "30-40 g por 10 L de agua". Cadena vacía si la etiqueta no la muestra — no la inventes.'),
     }),
     messages: [
       {
@@ -65,5 +67,6 @@ export async function identificarProducto(base64Image: string): Promise<Producto
     description: object.description,
     frequency_days: pautaValida ? dias : null,
     motivo: pautaValida ? object.motivo : null,
+    dosage: object.dosage?.trim() || null,
   };
 }

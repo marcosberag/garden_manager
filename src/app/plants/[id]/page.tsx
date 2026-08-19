@@ -35,8 +35,18 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
     .eq('plant_id', id)
     .order('date', { ascending: false });
 
+  // Historial fotográfico de evolución (la tabla llega con la migración 008;
+  // sin ella, la consulta devuelve error y la sección simplemente no sale).
+  const { data: fotosData } = await supabase
+    .from('plant_photos')
+    .select('*')
+    .eq('plant_id', id)
+    .order('created_at', { ascending: false })
+    .limit(12);
+  const fotos = fotosData || [];
+
   const todayStr = new Date().toISOString().split('T')[0];
-  
+
   const pastEvents = events?.filter(e => e.date <= todayStr && !e.notes?.includes('[PROGRAMADO]')) || [];
   const futureEvents = events?.filter(e => e.date > todayStr || e.notes?.includes('[PROGRAMADO]')).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) || [];
 
@@ -66,6 +76,33 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
           </div>
 
           <DiagnosticoPlanta plantId={id} />
+
+          {fotos.length > 0 && (
+            <div style={{ marginBottom: '32px' }}>
+              <h3 className="field-label" style={{ display: 'block', marginBottom: '12px' }}>Evolución</h3>
+              <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '6px' }}>
+                {fotos.map((f: { id: string; url: string; created_at: string; evolution: string | null; verdict: string | null; note: string | null }) => (
+                  <div key={f.id} style={{ flex: '0 0 150px', border: '1px solid var(--color-lichen)', borderRadius: '10px', overflow: 'hidden', backgroundColor: 'white' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt="" style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--color-slate-smoke)' }}>{String(f.created_at).slice(0, 10)}</span>
+                        {f.evolution === 'mejora' && <span className="tag tag--fern">Mejora</span>}
+                        {f.evolution === 'empeora' && <span className="tag tag--alert">Peor</span>}
+                        {f.evolution === 'igual' && <span className="tag tag--muted">Igual</span>}
+                      </div>
+                      {(f.verdict || f.note) && (
+                        <p style={{ fontSize: '11px', color: 'var(--color-slate-smoke)', margin: 0, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {f.verdict || f.note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Próximas Tareas de esta planta */}
           <div style={{ marginBottom: '40px' }}>

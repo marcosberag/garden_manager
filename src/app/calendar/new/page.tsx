@@ -19,9 +19,11 @@ export default async function NewEventPage({ searchParams }: {
   const sp = await searchParams;
   const metodoValido = ['foliar', 'raiz', 'suelo'].includes(sp?.method || '') ? sp.method : undefined;
 
-  // Fetch plants and products for the dropdowns
-  const { data: plants } = await supabase.from('plants').select('id, name, species').eq('user_id', user.id);
-  const { data: products } = await supabase.from('products').select('id, name, type, frequency_days').eq('user_id', user.id);
+  // Fetch plants and products for the dropdowns. El path y el tamaño de la
+  // planta permiten calcular la dosis con los metros reales del mapa; la
+  // descripción y la dosis del producto afinan pauta y caldo.
+  const { data: plants } = await supabase.from('plants').select('id, name, species, path, size').eq('user_id', user.id);
+  const { data: products } = await supabase.from('products').select('id, name, type, description, dosage, frequency_days').eq('user_id', user.id);
 
   const today = new Date().toISOString().split('T')[0];
 

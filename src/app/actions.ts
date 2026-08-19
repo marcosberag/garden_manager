@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { deducirFrecuencia, leerFrecuencia, etiquetaDeMetodo, frecuenciaSegunCaso } from '@/lib/frecuencias';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
+import { centroDeGeojson } from '@/lib/meteo';
+import { generarPlanAnual, type PropuestaPlan } from '@/lib/plan-anual';
 
 export async function addPlant(formData: FormData) {
   const supabase = await createClient();
@@ -85,6 +87,7 @@ export async function addProduct(formData: FormData) {
   const type = formData.get('type') as string;
   const description = formData.get('description') as string;
   const barcode = formData.get('barcode') as string;
+  const dosage = (formData.get('dosage') as string)?.trim();
 
   if (!name || !type) {
     throw new Error('El nombre y el tipo de producto son obligatorios');
@@ -103,6 +106,7 @@ export async function addProduct(formData: FormData) {
     type,
     description,
     barcode: barcode || null,
+    dosage: dosage || null,
     frequency_days,
     frequency_source,
   });
@@ -199,6 +203,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const type = formData.get('type') as string;
   const description = formData.get('description') as string;
   const barcode = formData.get('barcode') as string;
+  const dosage = (formData.get('dosage') as string)?.trim();
 
   if (!name || !type) throw new Error('El nombre y tipo son obligatorios');
 
@@ -223,7 +228,7 @@ export async function updateProduct(id: string, formData: FormData) {
 
   await supabase
     .from('products')
-    .update({ name, type, description, barcode: barcode || null, frequency_days, frequency_source })
+    .update({ name, type, description, barcode: barcode || null, dosage: dosage || null, frequency_days, frequency_source })
     .match({ id, user_id: user.id });
 
   // Si la pauta cambió, los avisos ya programados con este producto se
@@ -692,6 +697,7 @@ export async function addProductFromScan(identificado: {
   type: string;
   description?: string | null;
   frequency_days?: number | null;
+  dosage?: string | null;
 }): Promise<{ product?: any; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -713,6 +719,7 @@ export async function addProductFromScan(identificado: {
       name,
       type,
       description: identificado.description || null,
+      dosage: identificado.dosage || null,
       frequency_days,
       frequency_source: 'ia',
     })
@@ -1097,10 +1104,11 @@ export async function guardarRecorrido(detecciones: {
           continue;
         }
         const cambios: any = {};
-        // La foto se pone si falta, o si el usuario pidió sustituirla por esta.
-        if (d.foto && (d.actualizarFoto || !existente.image_url)) {
-          const url = await subirFoto(d.foto);
-          if (url) cambios.image_url = url;
+        // La captura se sube siempre: alimenta el historial de evolución.
+        const urlFoto = d.foto ? await subirFoto(d.foto) : null;
+        // La foto de portada se sustituye solo si falta o si el usuario lo pidió.
+        if (urlFoto && (d.actualizarFoto || !existente.image_url)) {
+          cambios.image_url = urlFoto;
         }
         if (existente.lat == null && !existente.path && d.lat != null && d.lng != null) {
           cambios.lat = d.lat;
@@ -1109,11 +1117,20 @@ export async function guardarRecorrido(detecciones: {
         if (Object.keys(cambios).length > 0) {
           await supabase.from('plants').update(cambios).match({ id: existente.id, user_id: user.id });
         }
+        if (urlFoto) {
+          // Si la tabla del historial aún no existe, este insert falla sin más.
+          await supabase.from('plant_photos').insert({
+            user_id: user.id,
+            plant_id: existente.id,
+            url: urlFoto,
+            note: d.descripcion?.slice(0, 400) || 'Captura del recorrido',
+          });
+        }
         actualizadas.push(existente.name);
       } else {
         const image_url = d.foto ? await subirFoto(d.foto) : null;
         const icon_category = await resolverCategoria(d.especie, nombre);
-        const { error } = await supabase.from('plants').insert({
+        const { data: creada, error } = await supabase.from('plants').insert({
           user_id: user.id,
           name: nombre,
           species: d.especie?.trim() || null,
@@ -1122,12 +1139,21 @@ export async function guardarRecorrido(detecciones: {
           image_url,
           lat: d.lat,
           lng: d.lng,
-        });
+        }).select('id').single();
         if (error) {
           console.error('Error guardando planta del recorrido:', error);
           errores.push(`${nombre}: no se pudo guardar.`);
         } else {
           creadas.push(nombre);
+          if (image_url && creada?.id) {
+            // Primera entrada del historial de evolución (si la tabla existe).
+            await supabase.from('plant_photos').insert({
+              user_id: user.id,
+              plant_id: creada.id,
+              url: image_url,
+              note: d.descripcion?.slice(0, 400) || 'Captura del recorrido',
+            });
+          }
         }
       }
     } catch (e) {
@@ -1139,4 +1165,90 @@ export async function guardarRecorrido(detecciones: {
   revalidatePath('/');
   revalidatePath('/plants');
   return { creadas, actualizadas, errores };
+}
+
+/**
+ * Genera la propuesta de plan preventivo anual: la IA mira plantas, inventario,
+ * historial y lo ya programado, más las plagas que el usuario declare (fuente
+ * de máxima autoridad: nada de inventar plagas). No inserta nada — devuelve
+ * las propuestas para que el usuario elija.
+ */
+export async function prepararPlanAnual(indicaciones: string): Promise<{ propuestas?: PropuestaPlan[]; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const { data: plants } = await supabase.from('plants').select('name, species, lat, lng').eq('user_id', user.id);
+  const { data: products } = await supabase.from('products').select('name, type, description').eq('user_id', user.id);
+  const { data: events } = await supabase.from('events')
+    .select('type, date, notes, products(name), plants(name)')
+    .order('date', { ascending: false })
+    .limit(120);
+
+  const linea = (e: any) => {
+    const producto = (e.products as any)?.name || e.type;
+    const planta = (e.plants as any)?.name;
+    const nota = e.notes ? ` — ${e.notes.replace(/\[[A-Z]+\]/g, '').trim().slice(0, 80)}` : '';
+    return `- ${e.date}: ${producto}${planta ? ` en ${planta}` : ''}${nota}`;
+  };
+  const reales = (events || []).filter((e: any) => !e.notes?.includes('[PROGRAMADO]')).slice(0, 40);
+  const programados = (events || []).filter((e: any) => e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')).slice(0, 30);
+
+  const { data: parcelas } = await supabase.from('parcels').select('geojson').eq('user_id', user.id).limit(1);
+  const conPos: any = (plants || []).find((p: any) => p.lat != null && p.lng != null);
+  const coordenadas = centroDeGeojson(parcelas?.[0]?.geojson)
+    || (conPos ? { lat: conPos.lat, lng: conPos.lng } : null);
+
+  const ahora = new Date();
+  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
+
+  const propuestas = await generarPlanAnual({
+    hoy,
+    coordenadas,
+    plantas: (plants || []).map((p: any) => ({ nombre: p.name, especie: p.species })),
+    inventario: (products || []).map((p: any) => ({ nombre: p.name, tipo: p.type, descripcion: p.description })),
+    historial: reales.map(linea),
+    programado: programados.map(linea),
+    indicaciones: indicaciones?.slice(0, 600) || null,
+  });
+
+  if (!propuestas) return { error: 'La IA no pudo generar el plan. Inténtalo de nuevo en un momento.' };
+  return { propuestas };
+}
+
+/**
+ * Programa las propuestas del plan anual que el usuario haya elegido, como
+ * avisos [PROGRAMADO] normales: entran en la agenda, el WhatsApp y el ciclo
+ * de hecho/pospuesto como cualquier otro.
+ */
+export async function aplicarPlanAnual(seleccion: PropuestaPlan[]): Promise<{ creadas: number; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { creadas: 0, error: 'Usuario no autenticado' };
+
+  const { data: plants } = await supabase.from('plants').select('id, name').eq('user_id', user.id);
+  const { data: products } = await supabase.from('products').select('id, name').eq('user_id', user.id);
+  const limpia = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+  let creadas = 0;
+  for (const p of seleccion.slice(0, 12)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.fecha)) continue;
+    const plant_id = p.planta ? (plants || []).find(x => limpia(x.name) === limpia(p.planta!))?.id ?? null : null;
+    const product_id = p.producto ? (products || []).find(x => limpia(x.name) === limpia(p.producto!))?.id ?? null : null;
+    const texto = `${p.titulo}. ${p.motivo}`.replace(/[\[\]]/g, '').slice(0, 380);
+    const { error } = await supabase.from('events').insert({
+      user_id: user.id,
+      type: p.tipo,
+      date: p.fecha,
+      notes: `[PROGRAMADO] Plan anual: ${texto}${p.hasta ? ` Revisar hasta: ${p.hasta.replace(/[\[\]]/g, '').slice(0, 120)}.` : ''}`,
+      frequency_days: p.frequency_days,
+      plant_id,
+      product_id,
+    });
+    if (!error) creadas += 1;
+  }
+
+  revalidatePath('/');
+  revalidatePath('/calendar');
+  return { creadas };
 }

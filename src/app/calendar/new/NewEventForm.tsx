@@ -11,9 +11,33 @@ type Sugerencia = {
   max_days: number | null;
   motivo: string;
   hasta: string | null;
+  dosis: string | null;
+  dosis_fuente: 'producto' | 'etiqueta' | 'general' | null;
+};
+
+const FUENTE_DOSIS: Record<string, string> = {
+  producto: 'la dosis que apuntaste en el producto',
+  etiqueta: 'según la etiqueta',
+  general: 'estimación general — contrasta con el envase',
 };
 
 const normaliza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+/** Longitud real en metros de una planta colocada como línea en el mapa. */
+const metrosDeTrayecto = (path?: [number, number][] | null): number | null => {
+  if (!path || path.length < 2) return null;
+  const R = 6371000;
+  const rad = (g: number) => g * Math.PI / 180;
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    const [la1, lo1] = path[i - 1];
+    const [la2, lo2] = path[i];
+    const a = Math.sin(rad(la2 - la1) / 2) ** 2 +
+      Math.cos(rad(la1)) * Math.cos(rad(la2)) * Math.sin(rad(lo2 - lo1) / 2) ** 2;
+    total += 2 * R * Math.asin(Math.sqrt(a));
+  }
+  return Math.round(total);
+};
 
 type Defaults = {
   plantId?: string;
@@ -73,10 +97,11 @@ export default function NewEventForm({ plants, products, today, defaults }: { pl
           headers: { 'Content-Type': 'application/json' },
           signal: controlador.signal,
           body: JSON.stringify({
-            producto: { nombre: productoElegido.name, tipo: productoElegido.type, descripcion: productoElegido.description },
+            producto: { nombre: productoElegido.name, tipo: productoElegido.type, descripcion: productoElegido.description, dosis: productoElegido.dosage || null },
             planta: planta ? { nombre: planta.name, especie: planta.species } : null,
             metodo: metodo || null,
             notas: notasRef.current?.value || null,
+            dimension: planta ? { metros: metrosDeTrayecto(planta.path), tamano: planta.size || null } : null,
           }),
         });
         if (res.ok) {
@@ -120,6 +145,7 @@ export default function NewEventForm({ plants, products, today, defaults }: { pl
       type: identificado.type,
       description: identificado.description,
       frequency_days: identificado.frequency_days,
+      dosage: identificado.dosage,
     });
 
     if (!resultado.product) {
@@ -265,6 +291,12 @@ export default function NewEventForm({ plants, products, today, defaults }: { pl
             {sugerencia.hasta && (
               <p style={{ fontSize: '13px', color: 'var(--color-graphite)', margin: '4px 0 0 0', lineHeight: '1.45' }}>
                 Hasta cuándo: {sugerencia.hasta}.
+              </p>
+            )}
+            {sugerencia.dosis && (
+              <p style={{ fontSize: '13px', color: 'var(--color-ink-black)', margin: '4px 0 0 0', lineHeight: '1.45' }}>
+                Dosis: {sugerencia.dosis}
+                {sugerencia.dosis_fuente && FUENTE_DOSIS[sugerencia.dosis_fuente] ? ` (${FUENTE_DOSIS[sugerencia.dosis_fuente]})` : ''}.
               </p>
             )}
           </div>
