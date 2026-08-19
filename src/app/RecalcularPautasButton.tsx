@@ -41,11 +41,11 @@ export default function RecalcularPautasButton() {
         disabled={fase === 'trabajando'}
         style={{
           color: 'white', backgroundColor: 'transparent', border: '1px solid var(--color-eucalyptus)',
-          fontSize: '11px', fontWeight: 'bold', padding: '4px 8px',
+          fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', letterSpacing: '1px',
           borderRadius: '4px', cursor: 'pointer', opacity: fase === 'trabajando' ? 0.5 : 1,
         }}
       >
-        {fase === 'trabajando' ? 'RECALCULANDO...' : 'PAUTAS IA'}
+        {fase === 'trabajando' ? 'RECALCULANDO…' : 'PAUTAS IA'}
       </button>
 
       {(fase === 'confirmar' || fase === 'resultado') && (
@@ -65,15 +65,15 @@ export default function RecalcularPautasButton() {
                   ¿Recalcular las pautas programadas?
                 </h3>
                 <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--color-graphite)', lineHeight: '1.5' }}>
-                  La IA repasará cada tarea programada (producto, planta y modo de aplicación)
-                  y reprogramará sus avisos con la frecuencia adecuada a cada caso, contando
-                  desde tu última aplicación real. Las tareas sin producto no se tocan.
+                  La IA repasa cada tarea programada — producto, planta y modo de aplicación —
+                  y reprograma sus avisos con la frecuencia adecuada a ese caso, contando desde
+                  tu última aplicación real. Las tareas sin producto no se tocan.
                 </p>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={cerrar} className="btn-outline" style={{ padding: '8px 16px', fontSize: '14px' }}>
+                  <button type="button" onClick={cerrar} className="btn-outline" style={{ padding: '10px 16px' }}>
                     Cancelar
                   </button>
-                  <button type="button" onClick={handleRecalcular} className="btn-solid" style={{ padding: '8px 16px', fontSize: '14px' }}>
+                  <button type="button" onClick={handleRecalcular} className="btn-solid" style={{ padding: '10px 16px' }}>
                     Recalcular
                   </button>
                 </div>
@@ -82,12 +82,12 @@ export default function RecalcularPautasButton() {
 
             {fase === 'resultado' && (
               <>
-                <h3 className="suisse" style={{ margin: '0 0 15px 0', fontSize: '18px' }}>
+                <h3 className="suisse" style={{ margin: '0 0 20px 0', fontSize: '18px' }}>
                   {resultado?.error ? 'No se pudo recalcular' : 'Pautas revisadas'}
                 </h3>
 
                 {resultado?.error && (
-                  <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#E74C3C' }}>{resultado.error}</p>
+                  <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: 'var(--color-alert)' }}>{resultado.error}</p>
                 )}
 
                 {!resultado?.error && (
@@ -99,21 +99,24 @@ export default function RecalcularPautasButton() {
                     )}
                     {resultado?.cambios?.map((c, i) => (
                       <div key={i} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid var(--color-mist)' }}>
-                        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 'bold' }}>
-                          {c.tarea}: cada {c.antes || '?'} → cada {c.ahora} días
+                        <p className="eyebrow" style={{ marginBottom: '4px' }}>{c.tarea}</p>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '15px' }}>
+                          cada {c.antes || '?'} días <span style={{ color: 'var(--color-eucalyptus)' }}>&rarr;</span> cada {c.ahora} días
                         </p>
-                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-graphite)', lineHeight: '1.4' }}>{c.motivo}</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-graphite)', lineHeight: '1.45' }}>{c.motivo}</p>
                       </div>
                     ))}
-                    <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: 'var(--color-graphite)' }}>
-                      {(resultado?.yaCorrectas ?? 0) > 0 && <>Ya estaban bien: {resultado?.yaCorrectas}. </>}
-                      {(resultado?.sinProducto ?? 0) > 0 && <>Sin producto asignado (no se tocan): {resultado?.sinProducto}.</>}
-                    </p>
+                    {((resultado?.yaCorrectas ?? 0) > 0 || (resultado?.sinProducto ?? 0) > 0) && (
+                      <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: 'var(--color-graphite)' }}>
+                        {(resultado?.yaCorrectas ?? 0) > 0 && <>Ya estaban bien: {resultado?.yaCorrectas}. </>}
+                        {(resultado?.sinProducto ?? 0) > 0 && <>Sin producto asignado, no se tocan: {resultado?.sinProducto}.</>}
+                      </p>
+                    )}
                   </>
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={cerrar} className="btn-solid" style={{ padding: '8px 16px', fontSize: '14px' }}>
+                  <button type="button" onClick={cerrar} className="btn-solid" style={{ padding: '10px 16px' }}>
                     Entendido
                   </button>
                 </div>

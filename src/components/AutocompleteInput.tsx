@@ -9,13 +9,26 @@ interface AutocompleteInputProps {
   defaultValue?: string;
   required?: boolean;
   apiEndpoint?: string;
+  // Modo controlado: si llegan value/onChange, el estado vive en el padre
+  // (lo necesita la ficha de producto para poder rellenar desde el escáner).
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
-export default function AutocompleteInput({ id, name, placeholder, defaultValue = '', required, apiEndpoint = '/api/plants/suggest' }: AutocompleteInputProps) {
-  const [value, setValue] = useState(defaultValue);
+export default function AutocompleteInput({ id, name, placeholder, defaultValue = '', required, apiEndpoint = '/api/plants/suggest', value, onChange }: AutocompleteInputProps) {
+  const [interno, setInterno] = useState(defaultValue);
+  const valor = value !== undefined ? value : interno;
+  const cambiar = (v: string) => {
+    if (onChange) onChange(v);
+    else setInterno(v);
+  };
+
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  // Solo se piden sugerencias mientras el usuario teclea aquí: un valor puesto
+  // desde fuera (el escáner) no debe abrir el desplegable.
+  const [enfocado, setEnfocado] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,14 +44,14 @@ export default function AutocompleteInput({ id, name, placeholder, defaultValue 
 
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (value.length < 2) {
+      if (valor.length < 2) {
         setSuggestions([]);
         return;
       }
-      
+
       setIsLoading(true);
       try {
-        const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(value)}`);
+        const res = await fetch(`${apiEndpoint}?q=${encodeURIComponent(valor)}`);
         if (res.ok) {
           const data = await res.json();
           setSuggestions(data);
@@ -53,17 +66,17 @@ export default function AutocompleteInput({ id, name, placeholder, defaultValue 
 
     // Debounce to prevent hitting the API on every single keystroke
     const timeoutId = setTimeout(() => {
-      // Only fetch if the user is actually typing something new and dropdown isn't hidden by a selection
-      if (value !== defaultValue) {
+      if (enfocado && valor !== defaultValue) {
         fetchSuggestions();
       }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [value, defaultValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valor, defaultValue, enfocado]);
 
   const handleSelect = (suggestion: string) => {
-    setValue(suggestion);
+    cambiar(suggestion);
     setShowDropdown(false);
   };
 
@@ -75,29 +88,21 @@ export default function AutocompleteInput({ id, name, placeholder, defaultValue 
         name={name}
         required={required}
         placeholder={placeholder}
-        value={value}
+        value={valor}
         onChange={(e) => {
-          setValue(e.target.value);
+          cambiar(e.target.value);
           setShowDropdown(true);
         }}
         onFocus={() => {
+          setEnfocado(true);
           if (suggestions.length > 0) setShowDropdown(true);
         }}
+        onBlur={() => setEnfocado(false)}
         autoComplete="off"
-        style={{
-          width: '100%',
-          padding: '15px',
-          backgroundColor: 'var(--color-pure-canvas)',
-          border: '1px solid var(--color-mist)',
-          borderRadius: '0',
-          fontFamily: 'inherit',
-          fontSize: '16px',
-          color: 'var(--color-ink-black)',
-          outline: 'none',
-          borderBottom: required ? '2px solid var(--color-eucalyptus)' : '1px solid var(--color-mist)'
-        }}
+        className="input-field"
+        style={{ borderBottom: required ? '2px solid var(--color-eucalyptus)' : undefined }}
       />
-      
+
       {isLoading && (
         <div style={{ position: 'absolute', right: '15px', top: '15px', fontSize: '12px', color: 'var(--color-graphite)' }}>
           Buscando...
@@ -122,7 +127,7 @@ export default function AutocompleteInput({ id, name, placeholder, defaultValue 
           overflowY: 'auto'
         }}>
           {suggestions.map((suggestion, index) => (
-            <li 
+            <li
               key={index}
               onClick={() => handleSelect(suggestion)}
               style={{
@@ -132,7 +137,7 @@ export default function AutocompleteInput({ id, name, placeholder, defaultValue 
                 fontSize: '14px',
                 color: 'var(--color-ink-black)'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-mist)'}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-fog)'}
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               {suggestion}

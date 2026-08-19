@@ -225,6 +225,13 @@ export async function updateProduct(id: string, formData: FormData) {
     .from('products')
     .update({ name, type, description, barcode: barcode || null, frequency_days, frequency_source })
     .match({ id, user_id: user.id });
+
+  // Si la pauta cambió, los avisos ya programados con este producto se
+  // reprograman solos: no hay que acordarse de recalcular nada.
+  if (frequency_days && frequency_days !== anterior?.frequency_days) {
+    await propagarFrecuenciaDeProducto(supabase, user.id, id, frequency_days);
+    revalidatePath('/');
+  }
   
   revalidatePath('/products');
   redirect('/products');
@@ -718,14 +725,114 @@ export async function addProductFromScan(identificado: {
 }
 
 /**
- * Repasa todas las tareas programadas y les recalcula la pauta con la IA según
- * su caso (producto + planta + modo si consta en las notas). Cuando la pauta
- * cambia, borra los avisos [PROGRAMADO] de esa tarea y los reprograma desde la
- * última aplicación real; si nunca la hubo, conserva la próxima cita y solo
- * reespacia las siguientes. Las tareas sin producto no se tocan: sin producto
- * no hay pauta que calcular.
+ * Eventos de la misma tarea: la combinación tipo + planta + producto, la misma
+ * que usa addEvent para reemplazar avisos programados.
  */
-export async function recalcularPautasProgramadas(): Promise<{
+function esMismaTarea(a: any, b: any): boolean {
+  return a.type === b.type &&
+    (a.plant_id || null) === (b.plant_id || null) &&
+    (a.product_id || null) === (b.product_id || null);
+}
+
+function agrupaPorTarea(programados: any[]): any[][] {
+  const grupos = new Map<string, any[]>();
+  for (const e of programados) {
+    const clave = `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
+    grupos.set(clave, [...(grupos.get(clave) || []), e]);
+  }
+  return [...grupos.values()];
+}
+
+/** El modo de aplicación que los eventos nuevos llevan escrito en las notas. */
+function metodoDeLasNotas(notes?: string | null): string | null {
+  return notes?.match(/\(aplicación ([^)]+)\)/)?.[1] || null;
+}
+
+/**
+ * Sustituye los avisos [PROGRAMADO] de una tarea por 3 nuevos con la pauta
+ * indicada, anclados en la última aplicación real; si nunca la hubo, conserva
+ * la próxima cita y solo reespacia las siguientes.
+ */
+async function reprogramarGrupo(
+  supabase: any,
+  userId: string,
+  grupo: any[],
+  todos: any[],
+  dias: number,
+  metodo: string | null,
+): Promise<boolean> {
+  const muestra = grupo[0];
+  const fechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const reales = todos.filter(e => esMismaTarea(e, muestra) && !e.notes?.includes('[PROGRAMADO]'));
+  const ultimaReal = reales.length ? reales[reales.length - 1].date : null;
+
+  let siguiente: Date;
+  if (ultimaReal) {
+    siguiente = new Date(ultimaReal);
+    siguiente.setDate(siguiente.getDate() + dias);
+  } else {
+    siguiente = new Date(muestra.date);
+  }
+  if (siguiente < hoy) siguiente = new Date(hoy);
+
+  const { error: errorBorrado } = await supabase.from('events').delete().in('id', grupo.map((g: any) => g.id));
+  if (errorBorrado) {
+    console.error('Error borrando los avisos antiguos:', errorBorrado);
+    return false;
+  }
+
+  const nuevos = [];
+  for (let i = 0; i < 3; i++) {
+    nuevos.push({
+      user_id: userId,
+      type: muestra.type,
+      date: fechaLocal(siguiente),
+      notes: `[PROGRAMADO] Tarea programada cada ${dias} días${metodo ? ` (aplicación ${metodo})` : ''}.`,
+      frequency_days: dias,
+      plant_id: muestra.plant_id || null,
+      product_id: muestra.product_id || null,
+    });
+    siguiente.setDate(siguiente.getDate() + dias);
+  }
+
+  const { error: errorInsercion } = await supabase.from('events').insert(nuevos);
+  if (errorInsercion) {
+    console.error('Error reprogramando los avisos:', errorInsercion);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Al cambiar la pauta de un producto, sus avisos programados se reprograman
+ * solos con la nueva frecuencia, sin pasos extra.
+ */
+async function propagarFrecuenciaDeProducto(supabase: any, userId: string, productId: string, dias: number) {
+  const { data: events } = await supabase
+    .from('events')
+    .select('id, type, date, notes, frequency_days, plant_id, product_id')
+    .order('date', { ascending: true });
+  if (!events) return;
+
+  const programados = events.filter((e: any) =>
+    e.product_id === productId && e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'));
+
+  for (const grupo of agrupaPorTarea(programados)) {
+    if (leerFrecuencia(grupo[0]) === dias) continue;
+    await reprogramarGrupo(supabase, userId, grupo, events, dias, metodoDeLasNotas(grupo[0].notes));
+  }
+}
+
+/**
+ * Repasa las tareas programadas (todas, o solo las de un producto) y les
+ * recalcula la pauta con la IA según su caso: producto + planta + modo si
+ * consta en las notas. Cuando la pauta cambia, reprograma sus avisos. Las
+ * tareas sin producto no se tocan: sin producto no hay pauta que calcular.
+ */
+export async function recalcularPautasProgramadas(productId?: string): Promise<{
   cambios?: { tarea: string; antes: number; ahora: number; motivo: string }[];
   yaCorrectas?: number;
   sinProducto?: number;
@@ -746,25 +853,15 @@ export async function recalcularPautasProgramadas(): Promise<{
     return { error: 'No se pudieron leer los eventos' };
   }
 
-  const programados = events.filter(e => e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'));
-
-  // Una "tarea" es la combinación tipo + planta + producto, la misma que usa
-  // addEvent para reemplazar los avisos programados.
-  const grupos = new Map<string, any[]>();
-  for (const e of programados) {
-    const clave = `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
-    grupos.set(clave, [...(grupos.get(clave) || []), e]);
-  }
-
-  const getLocalDateString = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
+  const programados = events.filter(e =>
+    e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]') &&
+    (!productId || e.product_id === productId));
 
   const cambios: { tarea: string; antes: number; ahora: number; motivo: string }[] = [];
   let yaCorrectas = 0;
   let sinProducto = 0;
 
-  for (const grupo of grupos.values()) {
+  for (const grupo of agrupaPorTarea(programados)) {
     const muestra: any = grupo[0];
     const producto: any = muestra.products;
     const planta: any = muestra.plants;
@@ -774,9 +871,7 @@ export async function recalcularPautasProgramadas(): Promise<{
       continue;
     }
 
-    // Los eventos nuevos llevan el modo en las notas; si consta, se aprovecha.
-    const metodo = muestra.notes?.match(/\(aplicación ([^)]+)\)/)?.[1] || null;
-
+    const metodo = metodoDeLasNotas(muestra.notes);
     const pauta = await frecuenciaSegunCaso({
       producto: { nombre: producto.name, tipo: producto.type, descripcion: producto.description },
       planta: planta ? { nombre: planta.name, especie: planta.species } : null,
@@ -786,58 +881,19 @@ export async function recalcularPautasProgramadas(): Promise<{
 
     const antes = leerFrecuencia(muestra);
     const ahora = pauta.frequency_days;
-    const tarea = `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`;
-
     if (ahora === antes) {
       yaCorrectas += 1;
       continue;
     }
 
-    // Ancla: la última aplicación real de esta misma tarea.
-    const reales = events.filter(e =>
-      e.type === muestra.type &&
-      (e.plant_id || null) === (muestra.plant_id || null) &&
-      (e.product_id || null) === (muestra.product_id || null) &&
-      !e.notes?.includes('[PROGRAMADO]')
-    );
-    const ultimaReal = reales.length ? reales[reales.length - 1].date : null;
-
-    let siguiente: Date;
-    if (ultimaReal) {
-      siguiente = new Date(ultimaReal);
-      siguiente.setDate(siguiente.getDate() + ahora);
-    } else {
-      siguiente = new Date(muestra.date);
-    }
-    if (siguiente < hoy) siguiente = new Date(hoy);
-
-    const { error: errorBorrado } = await supabase.from('events').delete().in('id', grupo.map((g: any) => g.id));
-    if (errorBorrado) {
-      console.error(`Error borrando los avisos antiguos de "${tarea}":`, errorBorrado);
-      continue;
-    }
-
-    const nuevos = [];
-    for (let i = 0; i < 3; i++) {
-      nuevos.push({
-        user_id: user.id,
-        type: muestra.type,
-        date: getLocalDateString(siguiente),
-        notes: `[PROGRAMADO] Tarea programada cada ${ahora} días${metodo ? ` (aplicación ${metodo})` : ''}.`,
-        frequency_days: ahora,
-        plant_id: muestra.plant_id || null,
-        product_id: muestra.product_id || null,
+    if (await reprogramarGrupo(supabase, user.id, grupo, events, ahora, metodo)) {
+      cambios.push({
+        tarea: `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`,
+        antes,
+        ahora,
+        motivo: pauta.motivo,
       });
-      siguiente.setDate(siguiente.getDate() + ahora);
     }
-
-    const { error: errorInsercion } = await supabase.from('events').insert(nuevos);
-    if (errorInsercion) {
-      console.error(`Error reprogramando "${tarea}":`, errorInsercion);
-      continue;
-    }
-
-    cambios.push({ tarea, antes, ahora, motivo: pauta.motivo });
   }
 
   revalidatePath('/');

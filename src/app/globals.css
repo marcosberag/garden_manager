@@ -231,3 +231,134 @@ button {
   height: 1px;
   background: currentColor;
 }
+
+/* ---------------------------------------------------------------------------
+   Formularios y acciones. Estas tres clases se usan por toda la app desde el
+   principio pero nunca llegaron a definirse: cada boton salia transparente y
+   con el estilo que tuviera puesto inline. Aqui esta su unica definicion.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Papel de los paneles: mas calido y claro que --color-mist, que es un gris
+     de borde y aplastaba los bloques que lo usaban de fondo. */
+  --color-fog: #f4f3ee;
+  --color-alert: #b3402a;
+  --color-alert-wash: #f9ece8;
+}
+
+.btn-solid,
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 0;
+  padding: 15px 23px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-solid {
+  background-color: var(--color-ink-black);
+  color: var(--color-pure-canvas);
+  border: 1px solid var(--color-ink-black);
+}
+
+.btn-solid:hover:not(:disabled) {
+  background-color: var(--color-eucalyptus);
+  border-color: var(--color-eucalyptus);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--color-ink-black);
+  border: 1px solid var(--color-ink-black);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-ink-black);
+  color: var(--color-pure-canvas);
+}
+
+.btn-solid:disabled,
+.btn-outline:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.input-field {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid var(--color-mist);
+  border-radius: 0;
+  background-color: var(--color-pure-canvas);
+  color: var(--color-ink-black);
+  font-family: inherit;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input-field:focus {
+  border-color: var(--color-eucalyptus);
+}
+
+textarea.input-field {
+  resize: vertical;
+}
+
+.field-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-graphite);
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--color-graphite);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Cejilla: la etiqueta pequena en eucalipto que anuncia de donde sale un dato
+   (la pauta calculada, la lectura de una etiqueta...). */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-eucalyptus);
+}
+
+/* Botones de escaner (camara y galeria): accion secundaria en eucalipto. */
+.btn-scan {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 0;
+  padding: 12px 15px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--color-eucalyptus);
+  border: 1px solid var(--color-eucalyptus);
+  background-color: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-scan:hover:not(:disabled) {
+  background-color: var(--color-eucalyptus);
+  color: var(--color-pure-canvas);
+}
+
+.btn-scan:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

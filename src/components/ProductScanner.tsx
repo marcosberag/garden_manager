@@ -2,12 +2,12 @@
 
 import React, { useRef, useState } from 'react';
 import type { ProductoIdentificado } from '@/lib/identificar-producto';
+import { IconoCamara, IconoGaleria } from '@/components/ScanIcons';
 
 /**
- * Botones de "identificar producto por foto": con la cámara o eligiendo una
- * imagen de la galería. Manda la foto a /api/products/identify y entrega el
- * resultado al formulario; el mensaje de qué se hizo con él (seleccionarlo,
- * darlo de alta...) lo pone quien lo usa.
+ * Identificación de un producto por foto: con la cámara o eligiendo una imagen
+ * de la galería. Manda la foto a /api/products/identify y entrega el resultado
+ * al formulario; el mensaje de qué se hizo con él lo pone quien lo usa.
  */
 export default function ProductScanner({ onIdentified }: { onIdentified: (producto: ProductoIdentificado) => Promise<void> | void }) {
   // Dos inputs porque `capture` fuerza la cámara en el móvil: uno la dispara
@@ -44,34 +44,21 @@ export default function ProductScanner({ onIdentified }: { onIdentified: (produc
     }
   };
 
-  const estiloBoton: React.CSSProperties = {
-    flex: 1,
-    padding: '12px',
-    backgroundColor: 'transparent',
-    color: analizando ? 'var(--color-graphite)' : 'var(--color-eucalyptus)',
-    border: '1px solid var(--color-eucalyptus)',
-    cursor: analizando ? 'not-allowed' : 'pointer',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    fontSize: '12px',
-    fontWeight: 'bold',
-  };
-
   return (
     <div>
       <input type="file" accept="image/*" capture="environment" ref={camaraRef} onChange={handleFileChange} style={{ display: 'none' }} />
       <input type="file" accept="image/*" ref={galeriaRef} onChange={handleFileChange} style={{ display: 'none' }} />
 
       <div style={{ display: 'flex', gap: '10px' }}>
-        <button type="button" onClick={() => camaraRef.current?.click()} disabled={analizando} style={estiloBoton}>
-          {analizando ? 'Leyendo la etiqueta...' : '📸 Identificar con cámara'}
+        <button type="button" className="btn-scan" onClick={() => camaraRef.current?.click()} disabled={analizando}>
+          <IconoCamara /> {analizando ? 'Leyendo la etiqueta…' : 'Identificar con la cámara'}
         </button>
-        <button type="button" onClick={() => galeriaRef.current?.click()} disabled={analizando} style={estiloBoton}>
-          {analizando ? '...' : '🖼️ Desde la galería'}
+        <button type="button" className="btn-scan" onClick={() => galeriaRef.current?.click()} disabled={analizando}>
+          <IconoGaleria /> Elegir de la galería
         </button>
       </div>
       {error && (
-        <p style={{ fontSize: '12px', color: '#E74C3C', marginTop: '8px', marginBottom: 0 }}>{error}</p>
+        <p style={{ fontSize: '12px', color: 'var(--color-alert)', marginTop: '8px', marginBottom: 0 }}>{error}</p>
       )}
     </div>
   );

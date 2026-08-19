@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import { IconoCamara, IconoGaleria } from '@/components/ScanIcons';
 
 export default function ImageScanner({ onIdentified }: { onIdentified: (species: string) => void }) {
   // Dos inputs porque `capture` fuerza la cámara en el móvil: uno la dispara
@@ -8,12 +9,14 @@ export default function ImageScanner({ onIdentified }: { onIdentified: (species:
   const camaraRef = useRef<HTMLInputElement>(null);
   const galeriaRef = useRef<HTMLInputElement>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsScanning(true);
+    setError(null);
     try {
       const formData = new FormData();
       formData.append('image', file);
@@ -29,33 +32,15 @@ export default function ImageScanner({ onIdentified }: { onIdentified: (species:
           onIdentified(data.species);
         }
       } else {
-        alert("Error al escanear la imagen. Inténtalo de nuevo.");
+        setError('No se pudo identificar la planta. Prueba con otra foto.');
       }
-    } catch (error) {
-      console.error(error);
-      alert("Error al conectar con la IA visual.");
+    } catch {
+      setError('No se pudo conectar con la IA visual.');
     } finally {
       setIsScanning(false);
       if (camaraRef.current) camaraRef.current.value = '';
       if (galeriaRef.current) galeriaRef.current.value = '';
     }
-  };
-
-  const estiloBoton: React.CSSProperties = {
-    flex: 1,
-    padding: '15px',
-    backgroundColor: isScanning ? 'var(--color-mist)' : 'var(--color-eucalyptus)',
-    color: isScanning ? 'var(--color-graphite)' : '#fff',
-    border: 'none',
-    cursor: isScanning ? 'not-allowed' : 'pointer',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    fontSize: '12px',
-    fontWeight: 'bold',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '10px',
   };
 
   return (
@@ -77,13 +62,16 @@ export default function ImageScanner({ onIdentified }: { onIdentified: (species:
       />
 
       <div style={{ display: 'flex', gap: '10px' }}>
-        <button type="button" onClick={() => camaraRef.current?.click()} disabled={isScanning} style={estiloBoton}>
-          {isScanning ? 'Analizando imagen...' : '📸 IDENTIFICAR CON CÁMARA'}
+        <button type="button" className="btn-scan" onClick={() => camaraRef.current?.click()} disabled={isScanning}>
+          <IconoCamara /> {isScanning ? 'Analizando la foto…' : 'Identificar con la cámara'}
         </button>
-        <button type="button" onClick={() => galeriaRef.current?.click()} disabled={isScanning} style={estiloBoton}>
-          {isScanning ? '...' : '🖼️ DESDE LA GALERÍA'}
+        <button type="button" className="btn-scan" onClick={() => galeriaRef.current?.click()} disabled={isScanning}>
+          <IconoGaleria /> Elegir de la galería
         </button>
       </div>
+      {error && (
+        <p style={{ fontSize: '12px', color: 'var(--color-alert)', marginTop: '8px', marginBottom: 0 }}>{error}</p>
+      )}
     </div>
   );
 }
