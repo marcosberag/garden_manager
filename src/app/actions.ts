@@ -961,7 +961,6 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
   const usados = new Set(events.map(e => e.product_id).filter(Boolean));
   const sinRegistrar = (productos || [])
     .filter(pr =>
-      pr.frequency_days &&
       !['Sustrato', 'Herramienta'].includes(pr.type) &&
       !usados.has(pr.id) &&
       (!productId || pr.id === productId))
