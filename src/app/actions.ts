@@ -1040,8 +1040,9 @@ export async function terminarTratamiento(eventId: string) {
 /**
  * Guarda el resultado de un recorrido con cámara por el jardín. Cada detección
  * crea una planta nueva (con su foto y su posición GPS si la hay) o completa
- * una ya registrada: a las existentes solo se les rellena lo que les falte
- * (foto, posición), nunca se les pisa nada.
+ * una ya registrada: a las existentes se les rellena lo que les falte (foto,
+ * posición) y, solo si el usuario lo marca, se les sustituye la foto por la
+ * captura del recorrido.
  */
 export async function guardarRecorrido(detecciones: {
   nombre: string;
@@ -1051,6 +1052,7 @@ export async function guardarRecorrido(detecciones: {
   lat: number | null;
   lng: number | null;
   plantaExistenteId: string | null;
+  actualizarFoto?: boolean; // en las ya registradas: sustituir su foto por esta captura
 }[]): Promise<{ creadas: string[]; actualizadas: string[]; errores: string[] }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -1095,7 +1097,8 @@ export async function guardarRecorrido(detecciones: {
           continue;
         }
         const cambios: any = {};
-        if (!existente.image_url && d.foto) {
+        // La foto se pone si falta, o si el usuario pidió sustituirla por esta.
+        if (d.foto && (d.actualizarFoto || !existente.image_url)) {
           const url = await subirFoto(d.foto);
           if (url) cambios.image_url = url;
         }

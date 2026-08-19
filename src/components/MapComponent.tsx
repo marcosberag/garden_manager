@@ -30,6 +30,7 @@ interface Plant {
   icon_emoji?: string;
   icon_category?: string;
   image_url?: string;
+  species_image_url?: string;
   path?: [number, number][];
 }
 
@@ -166,27 +167,39 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
 
         {plants.filter(p => (p.lat && p.lng) || (p.path && p.path.length > 0)).map(plant => {
 
-          // Con foto manda la foto, con el icono de su categoría como insignia;
-          // sin foto, el pin lleva el dibujo de la categoría dentro.
-          const iconHtml = plant.image_url
-            ? `<div style="position: relative; width: 42px; height: 42px;">
-                 <div style="width: 42px; height: 42px; border-radius: 50%; border: 3px solid ${VERDE_APP}; box-shadow: 0 3px 6px rgba(0,0,0,0.35); overflow: hidden; background-color: white;">
-                   <img src="${plant.image_url}" style="width: 100%; height: 100%; object-fit: cover;" />
-                 </div>
-                 <div style="position: absolute; right: -5px; bottom: -5px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
-                   ${svgDePlanta(plant.icon_category, 14)}
-                 </div>
-               </div>`
-            : pinDePlanta(plant.icon_category);
+          // Colocada como línea = seto: banda sobre el satélite y una chapa
+          // redonda centrada como etiqueta — nunca un pin de árbol clavado en
+          // mitad de la hilera.
+          const esSeto = !!(plant.path && plant.path.length > 1);
+          // La foto real manda; si no hay, la foto de la especie; si tampoco,
+          // el dibujo de la categoría.
+          const foto = plant.image_url || plant.species_image_url;
+
+          const iconHtml = esSeto
+            ? `<div style="width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.4); overflow: hidden; background: white; display: flex; align-items: center; justify-content: center;">${
+                foto
+                  ? `<img src="${foto}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                  : svgDePlanta(plant.icon_category, 22)
+              }</div>`
+            : foto
+              ? `<div style="position: relative; width: 42px; height: 42px;">
+                   <div style="width: 42px; height: 42px; border-radius: 50%; border: 3px solid ${plant.image_url ? VERDE_APP : '#77aa83'}; box-shadow: 0 3px 6px rgba(0,0,0,0.35); overflow: hidden; background-color: white;">
+                     <img src="${foto}" style="width: 100%; height: 100%; object-fit: cover;" />
+                   </div>
+                   <div style="position: absolute; right: -5px; bottom: -5px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
+                     ${svgDePlanta(plant.icon_category, 14)}
+                   </div>
+                 </div>`
+              : pinDePlanta(plant.icon_category);
 
           const plantIcon = L.divIcon({
             className: 'custom-plant-icon',
             html: iconHtml,
-            // La foto es un círculo y se centra en la coordenada; el pin apoya
-            // su punta en ella.
-            iconSize: plant.image_url ? [42, 42] : TAMANO_PIN,
-            iconAnchor: plant.image_url ? [21, 21] : ANCLA_PIN,
-            popupAnchor: plant.image_url ? [0, -22] : [0, -46]
+            // La chapa del seto y los círculos de foto se centran en la
+            // coordenada; el pin apoya su punta en ella.
+            iconSize: esSeto ? [34, 34] : (foto ? [42, 42] : TAMANO_PIN),
+            iconAnchor: esSeto ? [17, 17] : (foto ? [21, 21] : ANCLA_PIN),
+            popupAnchor: esSeto ? [0, -19] : (foto ? [0, -22] : [0, -46])
           });
           
           let centerLat = plant.lat;
@@ -199,12 +212,16 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
           }
 
           // Leaflet fails to render Polylines with 1 point.
-          const hasValidPath = plant.path && plant.path.length > 1;
+          const hasValidPath = esSeto;
 
           return (
             <React.Fragment key={plant.id}>
               {hasValidPath && (
-                <Polyline positions={plant.path!} color="var(--color-eucalyptus)" weight={4} />
+                <>
+                  {/* Banda de seto: sombra oscura debajo y salvia encima */}
+                  <Polyline positions={plant.path!} color="#09352e" weight={9} opacity={0.5} lineCap="round" lineJoin="round" />
+                  <Polyline positions={plant.path!} color="#77aa83" weight={5} opacity={0.9} lineCap="round" lineJoin="round" />
+                </>
               )}
               {centerLat !== null && centerLat !== undefined && centerLng !== null && centerLng !== undefined && (
                 <Marker 

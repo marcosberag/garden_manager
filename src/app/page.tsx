@@ -7,6 +7,8 @@ import SmartCalendar from '@/app/calendar/SmartCalendar';
 import ChatWidget from '@/components/ChatWidget';
 import RecalcularPautasButton from './RecalcularPautasButton';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
+import { categoriaDeEspecie } from '@/lib/plant-icons';
+import { fotoDeEspecie } from '@/lib/foto-especie';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -28,17 +30,29 @@ export default async function HomePage() {
     .select('*')
     .eq('user_id', user.id);
 
-  // Relleno perezoso: las plantas de antes del sistema de iconos no tienen
-  // categoría y salían todas con el brote genérico en el mapa. Se resuelve
-  // aquí una única vez (reglas de texto gratis; IA solo para lo que no encaje)
-  // y queda guardado para siempre.
-  const sinCategoria = (plants || []).filter(p => !p.icon_category).slice(0, 30);
-  if (sinCategoria.length > 0) {
-    await Promise.all(sinCategoria.map(async p => {
-      p.icon_category = await resolverCategoria(p.species, p.name);
-      await supabase.from('plants').update({ icon_category: p.icon_category }).match({ id: p.id, user_id: user.id });
+  // Relleno perezoso de categorías: las plantas de antes del sistema de iconos
+  // no tienen categoría (y alguna quedó guardada como "generica" por un fallo
+  // puntual de la IA). Se cura aquí y queda guardado: las vacías con reglas +
+  // IA; las "generica" solo con las reglas de texto, que son gratis.
+  const porArreglar = (plants || []).filter(p => !p.icon_category || p.icon_category === 'generica').slice(0, 30);
+  if (porArreglar.length > 0) {
+    await Promise.all(porArreglar.map(async p => {
+      const nueva = p.icon_category === 'generica'
+        ? categoriaDeEspecie(p.species, p.name)
+        : await resolverCategoria(p.species, p.name);
+      if (nueva && nueva !== p.icon_category) {
+        p.icon_category = nueva;
+        await supabase.from('plants').update({ icon_category: nueva }).match({ id: p.id, user_id: user.id });
+      }
     }));
   }
+
+  // Pin con cara: si la planta aún no tiene foto real, el pin enseña una foto
+  // de su especie (Wikipedia, cacheada un mes). La foto real, cuando llegue
+  // del recorrido o de la ficha, manda sobre esta.
+  await Promise.all((plants || []).filter(p => !p.image_url).map(async p => {
+    p.species_image_url = await fotoDeEspecie(p.species, p.name);
+  }));
 
   const { data: parcel } = await supabase
     .from('parcels')

@@ -26,6 +26,8 @@ interface Plant {
   lng?: number;
   location?: string;
   icon_category?: string;
+  image_url?: string;
+  species_image_url?: string;
   path?: [number, number][];
 }
 

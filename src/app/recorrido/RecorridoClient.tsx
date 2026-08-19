@@ -27,6 +27,7 @@ export type Deteccion = {
   lat: number | null;
   lng: number | null;
   plantaExistenteId: string; // '' = planta nueva
+  actualizarFoto: boolean; // en las ya registradas: usar esta captura como su foto
   incluir: boolean;
 };
 
@@ -147,6 +148,7 @@ export default function RecorridoClient({ plantas, parcel }: { plantas: PlantaRe
         lat: posRef.current?.lat ?? null,
         lng: posRef.current?.lng ?? null,
         plantaExistenteId: existente?.id || '',
+        actualizarFoto: existente ? !existente.tieneFoto : true,
         incluir: true,
       };
       setDetecciones(prev => [...prev, nueva]);
@@ -283,6 +285,7 @@ export default function RecorridoClient({ plantas, parcel }: { plantas: PlantaRe
           lat: d.lat,
           lng: d.lng,
           plantaExistenteId: d.plantaExistenteId || null,
+          actualizarFoto: d.actualizarFoto,
         })),
       );
       setResumen(r);
@@ -504,7 +507,13 @@ export default function RecorridoClient({ plantas, parcel }: { plantas: PlantaRe
                   className="input-field"
                   style={{ flex: '1 1 180px', padding: '8px 10px', fontSize: '13px' }}
                   value={d.plantaExistenteId}
-                  onChange={e => editar(d.key, { plantaExistenteId: e.target.value })}
+                  onChange={e => {
+                    const elegida = plantas.find(p => p.id === e.target.value);
+                    editar(d.key, {
+                      plantaExistenteId: e.target.value,
+                      actualizarFoto: elegida ? !elegida.tieneFoto : true,
+                    });
+                  }}
                 >
                   <option value="">Planta nueva</option>
                   {plantas.map(p => (
@@ -524,6 +533,12 @@ export default function RecorridoClient({ plantas, parcel }: { plantas: PlantaRe
                   Guardar
                 </label>
               </div>
+              {d.plantaExistenteId && (
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-slate-smoke)', cursor: 'pointer', marginTop: '8px' }}>
+                  <input type="checkbox" checked={d.actualizarFoto} onChange={e => editar(d.key, { actualizarFoto: e.target.checked })} />
+                  Usar esta captura como foto de la planta
+                </label>
+              )}
             </div>
           </div>
         </div>
