@@ -915,8 +915,9 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
     if (clavesPendientes.has(clave)) continue;
     const producto: any = ultimo.products;
     const planta: any = ultimo.plants;
-    // Sin pauta en el producto la tarea se considera puntual y no se resucita.
-    if (!producto?.name || !producto.frequency_days) continue;
+    if (!producto?.name) continue;
+    // Un sustrato o una herramienta no se aplican cada X días.
+    if (['Sustrato', 'Herramienta'].includes(producto.type)) continue;
 
     const metodo = metodoDeLasNotas(ultimo.notes);
     const pauta = await frecuenciaSegunCaso({
@@ -924,7 +925,18 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
       planta: planta ? { nombre: planta.name, especie: planta.species } : null,
       metodo,
     });
+    // La pauta del caso manda; la guardada del producto es el respaldo. Los
+    // productos de antes de que existiera la columna la tienen vacía, y por
+    // eso no pueden ser requisito: se rellena aquí con lo que diga la IA.
     const dias = pauta?.frequency_days ?? producto.frequency_days;
+    if (!dias) continue;
+
+    if (!producto.frequency_days && ultimo.product_id) {
+      await supabase
+        .from('products')
+        .update({ frequency_days: dias, frequency_source: 'ia' })
+        .match({ id: ultimo.product_id, user_id: user.id });
+    }
 
     if (await reprogramarTarea(supabase, user.id, ultimo, [], events, dias, metodo)) {
       reactivadas.push({
