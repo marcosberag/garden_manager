@@ -1,4 +1,4 @@
-import { Metadata } from "next";
+import { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { signout } from "@/app/login/actions";
@@ -7,6 +7,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Brotes - Gestión de Jardín",
   description: "Un paseo tranquilo por un vivero al amanecer.",
+  appleWebApp: {
+    capable: true,
+    title: "Brotes",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#09352e",
 };
 
 export default async function RootLayout({
