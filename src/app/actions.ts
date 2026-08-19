@@ -843,6 +843,8 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
   reactivadas?: { tarea: string; dias: number; ultima: string; motivo: string; hasta: string | null }[];
   yaCorrectas?: string[];
   sinProducto?: number;
+  sinPauta?: string[];
+  sinRegistrar?: string[];
   error?: string;
 }> {
   const supabase = await createClient();
@@ -867,6 +869,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
   const cambios: { tarea: string; antes: number; ahora: number; motivo: string; hasta: string | null }[] = [];
   const reactivadas: { tarea: string; dias: number; ultima: string; motivo: string; hasta: string | null }[] = [];
   const yaCorrectas: string[] = [];
+  const sinPauta: string[] = [];
   let sinProducto = 0;
 
   for (const grupo of agrupaPorTarea(programados)) {
@@ -929,7 +932,10 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
     // productos de antes de que existiera la columna la tienen vacía, y por
     // eso no pueden ser requisito: se rellena aquí con lo que diga la IA.
     const dias = pauta?.frequency_days ?? producto.frequency_days;
-    if (!dias) continue;
+    if (!dias) {
+      sinPauta.push(`${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`);
+      continue;
+    }
 
     if (!producto.frequency_days && ultimo.product_id) {
       await supabase
@@ -949,7 +955,19 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
     }
   }
 
+  const { data: productos } = await supabase
+    .from('products')
+    .select('id, name, type, frequency_days');
+  const usados = new Set(events.map(e => e.product_id).filter(Boolean));
+  const sinRegistrar = (productos || [])
+    .filter(pr =>
+      pr.frequency_days &&
+      !['Sustrato', 'Herramienta'].includes(pr.type) &&
+      !usados.has(pr.id) &&
+      (!productId || pr.id === productId))
+    .map(pr => pr.name);
+
   revalidatePath('/');
   revalidatePath('/calendar');
-  return { cambios, reactivadas, yaCorrectas, sinProducto };
+  return { cambios, reactivadas, yaCorrectas, sinProducto, sinPauta, sinRegistrar };
 }

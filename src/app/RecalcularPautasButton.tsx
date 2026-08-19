@@ -8,6 +8,8 @@ type Resultado = {
   reactivadas?: { tarea: string; dias: number; ultima: string; motivo: string; hasta: string | null }[];
   yaCorrectas?: string[];
   sinProducto?: number;
+  sinPauta?: string[];
+  sinRegistrar?: string[];
   error?: string;
 };
 
@@ -146,8 +148,20 @@ export default function RecalcularPautasButton() {
                       </p>
                     )}
                     {(resultado?.sinProducto ?? 0) > 0 && (
-                      <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: 'var(--color-graphite)' }}>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--color-graphite)' }}>
                         Tareas sin producto asignado, sin tocar: {resultado?.sinProducto}.
+                      </p>
+                    )}
+                    {(resultado?.sinRegistrar?.length ?? 0) > 0 && (
+                      <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: 'var(--color-graphite)', lineHeight: '1.5' }}>
+                        Con pauta pero sin ningún tratamiento registrado: {resultado?.sinRegistrar?.join(' · ')}.
+                        Regístralos una vez desde «Registrar tratamiento» (con la fecha de la última
+                        aplicación real) y entrarán en seguimiento.
+                      </p>
+                    )}
+                    {(resultado?.sinPauta?.length ?? 0) > 0 && (
+                      <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: 'var(--color-graphite)', lineHeight: '1.5' }}>
+                        No se pudo calcular pauta para: {resultado?.sinPauta?.join(' · ')}.
                       </p>
                     )}
                   </>
