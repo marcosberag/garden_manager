@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
     const tomorrowStr = getLocalDateString(tomorrowObj);
 
     let msgLines: string[] = [];
+    // Condición de parada que llevan los avisos en las notas ("Revisar hasta:
+    // mientras haya síntomas."). Si aparece, el mensaje la enseña y pregunta.
+    const revisarDe = (e: any) => e.notes?.match(/Revisar hasta: (.+?)\.(?:\s|$)/)?.[1] || null;
+    let hayCondiciones = false;
 
     // Pending real events in the future (including today)
     const pendingEvents = events?.filter(e => (!e.notes || !e.notes.includes('[PROGRAMADO]')) && (!e.notes || !e.notes.includes('[HECHO]')) && e.date >= todayStr) || [];
@@ -88,7 +92,9 @@ export async function GET(request: NextRequest) {
         normalToday.forEach(e => {
           const product = (e.products as any)?.name || e.type;
           const plant = (e.plants as any)?.name || 'General';
-          msgLines.push(`- ${product} en ${plant}`);
+          const revisar = revisarDe(e);
+          if (revisar) hayCondiciones = true;
+          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
         });
         msgLines.push('');
       }
@@ -98,7 +104,9 @@ export async function GET(request: NextRequest) {
         postponedToday.forEach(e => {
           const product = (e.products as any)?.name || e.type;
           const plant = (e.plants as any)?.name || 'General';
-          msgLines.push(`- ${product} en ${plant}`);
+          const revisar = revisarDe(e);
+          if (revisar) hayCondiciones = true;
+          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
         });
         msgLines.push('');
       }
@@ -113,7 +121,9 @@ export async function GET(request: NextRequest) {
         normalTomorrow.forEach(e => {
           const product = (e.products as any)?.name || e.type;
           const plant = (e.plants as any)?.name || 'General';
-          msgLines.push(`- ${product} en ${plant}`);
+          const revisar = revisarDe(e);
+          if (revisar) hayCondiciones = true;
+          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
         });
         msgLines.push('');
       }
@@ -123,10 +133,16 @@ export async function GET(request: NextRequest) {
         postponedTomorrow.forEach(e => {
           const product = (e.products as any)?.name || e.type;
           const plant = (e.plants as any)?.name || 'General';
-          msgLines.push(`- ${product} en ${plant}`);
+          const revisar = revisarDe(e);
+          if (revisar) hayCondiciones = true;
+          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
         });
         msgLines.push('');
       }
+    }
+
+    if (hayCondiciones) {
+      msgLines.push('🔎 ¿Siguen los síntomas? Si alguna condición de arriba ya se cumplió, da por terminado ese tratamiento desde la app y dejará de avisar.');
     }
 
     if (msgLines.length === 0) {

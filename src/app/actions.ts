@@ -343,6 +343,10 @@ export async function addEvent(formData: FormData) {
   // El modo de aplicación viaja dentro de las notas, en texto legible: no hace
   // falta otra columna y el calendario y los avisos ya enseñan las notas.
   const etiquetaMetodo = etiquetaDeMetodo(application_method || null);
+  // Condición de parada que calculó la IA para este caso. Viaja en las notas
+  // de los avisos programados: el calendario la enseña y el WhatsApp pregunta.
+  const hastaBruto = (formData.get('until_hint') as string || '').trim();
+  const hastaCuando = hastaBruto.replace(/[\[\]\r\n]/g, '').slice(0, 140) || null;
   const notasUsuario = notes?.trim() || '';
   const notasFinales = notasUsuario
     ? (etiquetaMetodo ? `${notasUsuario} (aplicación ${etiquetaMetodo})` : notasUsuario)
@@ -393,7 +397,7 @@ export async function addEvent(formData: FormData) {
         user_id: user.id,
         type,
         date: getLocalDateString(nextDate),
-        notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días${etiquetaMetodo ? ` (aplicación ${etiquetaMetodo})` : ''}.`,
+        notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días${etiquetaMetodo ? ` (aplicación ${etiquetaMetodo})` : ''}.${hastaCuando ? ` Revisar hasta: ${hastaCuando}.` : ''}`,
         frequency_days,
         plant_id: plant_id || null,
         product_id: product_id || null
@@ -750,6 +754,11 @@ function metodoDeLasNotas(notes?: string | null): string | null {
   return notes?.match(/\(aplicación ([^)]+)\)/)?.[1] || null;
 }
 
+/** La condición de parada que los avisos llevan escrita en las notas. */
+function hastaDeLasNotas(notes?: string | null): string | null {
+  return notes?.match(/Revisar hasta: (.+?)\.(?:\s|$)/)?.[1] || null;
+}
+
 /**
  * Deja una tarea con 3 avisos [PROGRAMADO] a la pauta indicada, borrando antes
  * los que hubiera. El primer aviso se ancla en la última aplicación real; si
@@ -763,6 +772,7 @@ async function reprogramarTarea(
   todos: any[],
   dias: number,
   metodo: string | null,
+  hasta: string | null,
 ): Promise<boolean> {
   const fechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const hoy = new Date();
@@ -794,7 +804,7 @@ async function reprogramarTarea(
       user_id: userId,
       type: tarea.type,
       date: fechaLocal(siguiente),
-      notes: `[PROGRAMADO] Tarea programada cada ${dias} días${metodo ? ` (aplicación ${metodo})` : ''}.`,
+      notes: `[PROGRAMADO] Tarea programada cada ${dias} días${metodo ? ` (aplicación ${metodo})` : ''}.${hasta ? ` Revisar hasta: ${hasta}.` : ''}`,
       frequency_days: dias,
       plant_id: tarea.plant_id || null,
       product_id: tarea.product_id || null,
@@ -826,7 +836,7 @@ async function propagarFrecuenciaDeProducto(supabase: any, userId: string, produ
 
   for (const grupo of agrupaPorTarea(programados)) {
     if (leerFrecuencia(grupo[0]) === dias) continue;
-    await reprogramarTarea(supabase, userId, grupo[0], grupo.map((g: any) => g.id), events, dias, metodoDeLasNotas(grupo[0].notes));
+    await reprogramarTarea(supabase, userId, grupo[0], grupo.map((g: any) => g.id), events, dias, metodoDeLasNotas(grupo[0].notes), hastaDeLasNotas(grupo[0].notes));
   }
 }
 
@@ -898,7 +908,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
       continue;
     }
 
-    if (await reprogramarTarea(supabase, user.id, muestra, grupo.map((g: any) => g.id), events, ahora, metodo)) {
+    if (await reprogramarTarea(supabase, user.id, muestra, grupo.map((g: any) => g.id), events, ahora, metodo, pauta.hasta ?? hastaDeLasNotas(muestra.notes))) {
       cambios.push({ tarea, antes, ahora, motivo: pauta.motivo, hasta: pauta.hasta });
     }
   }
@@ -916,6 +926,9 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
 
   for (const [clave, ultimo] of ultimaRealPorTarea) {
     if (clavesPendientes.has(clave)) continue;
+    // [FIN] marca un tratamiento dado por terminado a propósito: no se
+    // resucita hasta que el usuario vuelva a registrarlo.
+    if (ultimo.notes?.includes('[FIN]')) continue;
     const producto: any = ultimo.products;
     const planta: any = ultimo.plants;
     if (!producto?.name) continue;
@@ -944,7 +957,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
         .match({ id: ultimo.product_id, user_id: user.id });
     }
 
-    if (await reprogramarTarea(supabase, user.id, ultimo, [], events, dias, metodo)) {
+    if (await reprogramarTarea(supabase, user.id, ultimo, [], events, dias, metodo, pauta?.hasta ?? null)) {
       reactivadas.push({
         tarea: `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`,
         dias,
@@ -969,4 +982,57 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
   revalidatePath('/');
   revalidatePath('/calendar');
   return { cambios, reactivadas, yaCorrectas, sinProducto, sinPauta, sinRegistrar };
+}
+
+/**
+ * Da por terminado un tratamiento: borra los avisos [PROGRAMADO] pendientes de
+ * su misma tarea y marca la última aplicación real con [FIN] para que la
+ * revisión de pautas no lo resucite. El historial se conserva, y registrar de
+ * nuevo el tratamiento lo reabre con normalidad.
+ */
+export async function terminarTratamiento(eventId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data: evento } = await supabase
+    .from('events')
+    .select('type, plant_id, product_id')
+    .match({ id: eventId, user_id: user.id })
+    .single();
+  if (!evento) return;
+
+  let borrado = supabase.from('events').delete()
+    .eq('user_id', user.id)
+    .eq('type', evento.type)
+    .like('notes', '%[PROGRAMADO]%')
+    .not('notes', 'like', '%[HECHO]%');
+  borrado = evento.plant_id ? borrado.eq('plant_id', evento.plant_id) : borrado.is('plant_id', null);
+  borrado = evento.product_id ? borrado.eq('product_id', evento.product_id) : borrado.is('product_id', null);
+  await borrado;
+
+  // Marcar la última aplicación real con [FIN]. El or() cubre las notas nulas:
+  // NOT LIKE sobre NULL las dejaría fuera y son aplicaciones válidas.
+  let consulta = supabase
+    .from('events')
+    .select('id, notes')
+    .eq('user_id', user.id)
+    .eq('type', evento.type)
+    .or('notes.is.null,notes.not.like.*[PROGRAMADO]*')
+    .order('date', { ascending: false })
+    .limit(1);
+  consulta = evento.plant_id ? consulta.eq('plant_id', evento.plant_id) : consulta.is('plant_id', null);
+  consulta = evento.product_id ? consulta.eq('product_id', evento.product_id) : consulta.is('product_id', null);
+  const { data: ultimas } = await consulta;
+  const ultima = ultimas?.[0];
+  if (ultima && !ultima.notes?.includes('[FIN]')) {
+    await supabase
+      .from('events')
+      .update({ notes: `${ultima.notes || ''} [FIN]`.trim() })
+      .match({ id: ultima.id, user_id: user.id });
+  }
+
+  revalidatePath('/');
+  revalidatePath('/calendar');
 }

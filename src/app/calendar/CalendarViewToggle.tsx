@@ -158,6 +158,10 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
       tags.push({ text: 'HECHO', color: '#27AE60', bg: '#EAFAF1' });
       cleanText = cleanText.replace(/\[HECHO\]/g, '');
     }
+    if (cleanText.includes('[FIN]')) {
+      tags.push({ text: 'TERMINADO', color: '#7F8C8D', bg: '#F2F3F4' });
+      cleanText = cleanText.replace(/\[FIN\]/g, '');
+    }
     
     // La frecuencia viene de la columna del evento. Los eventos antiguos la
     // llevan escrita en el propio texto como "[FREQ:15] (Manual)": se lee de ahí
@@ -327,6 +331,21 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                         ✓ HECHO
                       </button>
                     </div>
+                  )}
+                  {!item.isPast && item.id && item.isSuggestion && (
+                    <button
+                      onClick={() => {
+                        if (!window.confirm('¿Dar por terminado este tratamiento? Se eliminan sus próximos avisos programados; el historial se conserva.')) return;
+                        startTransition(async () => {
+                          const { terminarTratamiento } = await import('@/app/actions');
+                          await terminarTratamiento(item.id);
+                        });
+                      }}
+                      style={{ fontSize: '9px', color: '#7F8C8D', backgroundColor: '#F2F3F4', border: '1px solid #BDC3C7', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
+                      disabled={isPending}
+                    >
+                      TERMINAR TRATAMIENTO
+                    </button>
                   )}
                   {item.id && (
                     <a href={`/calendar/${item.id}/edit`} style={{ fontSize: '10px', color: '#3498DB', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', border: '1px solid #3498DB', borderRadius: '4px', textAlign: 'center' }}>

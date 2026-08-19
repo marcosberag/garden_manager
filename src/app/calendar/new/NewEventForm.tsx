@@ -269,6 +269,7 @@ export default function NewEventForm({ plants, products, today }: { plants: any[
         <p className="field-hint" style={{ marginTop: '12px' }}>
           Con una frecuencia puesta se programan las 3 próximas aplicaciones y te avisan por WhatsApp.
         </p>
+        <input type="hidden" name="until_hint" value={sugerencia?.hasta || ''} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
