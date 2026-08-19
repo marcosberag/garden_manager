@@ -58,9 +58,12 @@ export default async function PlantsPage() {
               )}
             </div>
             
-            <div style={{ marginTop: '75px' }}>
-              <Link href="/plants/new" className="btn-ghost" style={{ borderColor: 'var(--color-ink-black)', display: 'inline-block', textDecoration: 'none' }}>
-                AÑADIR PLANTA <span>&rarr;&rarr;</span>
+            <div style={{ marginTop: '48px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <Link href="/plants/new" className="btn-ghost" style={{ textDecoration: 'none' }}>
+                Añadir planta <span>&rarr;</span>
+              </Link>
+              <Link href="/recorrido" className="btn-solid" style={{ textDecoration: 'none' }}>
+                ◉ Recorrido con cámara
               </Link>
             </div>
           </div>

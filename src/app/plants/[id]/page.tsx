@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import PlantFormClient from '../PlantFormClient';
 import MarkCuredButton from './MarkCuredButton';
+import DiagnosticoPlanta from './DiagnosticoPlanta';
 
 export default async function PlantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -45,24 +46,26 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
         &larr; Inicio
       </Link>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'flex-start' }}>
-        
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '40px', alignItems: 'flex-start' }}>
+
         {/* COLUMNA IZQUIERDA: Ficha y Edición */}
         <div>
           <PlantFormClient initialData={plant} isEdit={true} />
         </div>
 
-        {/* COLUMNA DERECHA: Calendario Específico */}
-        <div style={{ backgroundColor: 'var(--color-mist)', padding: '40px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-            <h2 className="suisse" style={{ fontSize: '24px', margin: 0 }}>Tratamientos</h2>
-            <div style={{ display: 'flex', gap: '10px' }}>
+        {/* COLUMNA DERECHA: Diagnóstico y Calendario Específico */}
+        <div className="card" style={{ padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '24px' }}>
+            <h2 className="suisse" style={{ fontSize: '20px', margin: 0 }}>Tratamientos</h2>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <MarkCuredButton plantId={id} />
-              <Link href={`/calendar/new?plant_id=${plant.id}`} className="btn-solid" style={{ fontSize: '11px', padding: '8px 15px', textDecoration: 'none' }}>
-                + REGISTRAR HOY
+              <Link href={`/calendar/new?plant_id=${plant.id}`} className="chip-btn" style={{ textDecoration: 'none' }}>
+                + Registrar hoy
               </Link>
             </div>
           </div>
+
+          <DiagnosticoPlanta plantId={id} />
 
           {/* Próximas Tareas de esta planta */}
           <div style={{ marginBottom: '40px' }}>
@@ -75,8 +78,9 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
                 {futureEvents.map((rec: any, idx: number) => {
                   const isUrgent = rec.date <= todayStr;
                   return (
-                    <div key={idx} style={{ 
-                      backgroundColor: 'white', padding: '15px', borderLeft: `3px solid ${isUrgent ? 'var(--color-alert)' : 'var(--color-eucalyptus)'}`
+                    <div key={idx} style={{
+                      backgroundColor: 'white', padding: '15px', border: '1px solid var(--color-lichen)', borderRadius: '12px',
+                      borderLeft: `3px solid ${isUrgent ? 'var(--color-alert)' : 'var(--color-muted-sage)'}`
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{rec.products?.name ? rec.products.name : rec.type}</span>

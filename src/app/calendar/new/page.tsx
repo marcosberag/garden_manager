@@ -4,13 +4,20 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import NewEventForm from './NewEventForm';
 
-export default async function NewEventPage() {
+export default async function NewEventPage({ searchParams }: {
+  searchParams: Promise<{ plant_id?: string; product_id?: string; method?: string; notes?: string }>
+}) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     redirect('/login');
   }
+
+  // Valores iniciales por URL: la ficha de planta y el diagnóstico por foto
+  // encadenan aquí con planta, producto, modo y notas ya puestos.
+  const sp = await searchParams;
+  const metodoValido = ['foliar', 'raiz', 'suelo'].includes(sp?.method || '') ? sp.method : undefined;
 
   // Fetch plants and products for the dropdowns
   const { data: plants } = await supabase.from('plants').select('id, name, species').eq('user_id', user.id);
@@ -38,7 +45,17 @@ export default async function NewEventPage() {
               tratamiento.
             </h1>
 
-            <NewEventForm plants={plants || []} products={products || []} today={today} />
+            <NewEventForm
+              plants={plants || []}
+              products={products || []}
+              today={today}
+              defaults={{
+                plantId: sp?.plant_id,
+                productId: sp?.product_id,
+                metodo: metodoValido,
+                notas: sp?.notes?.slice(0, 500),
+              }}
+            />
           </div>
         </div>
       </section>

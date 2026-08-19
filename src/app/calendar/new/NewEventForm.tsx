@@ -15,19 +15,31 @@ type Sugerencia = {
 
 const normaliza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
-export default function NewEventForm({ plants, products, today }: { plants: any[], products: any[], today: string }) {
+type Defaults = {
+  plantId?: string;
+  productId?: string;
+  metodo?: string;
+  notas?: string;
+};
+
+export default function NewEventForm({ plants, products, today, defaults }: { plants: any[], products: any[], today: string, defaults?: Defaults }) {
   const [dates, setDates] = useState<string[]>([today]);
   const [loading, setLoading] = useState(false);
 
   // Copia local del inventario: el escáner puede dar de alta un producto nuevo
   // y hay que poder seleccionarlo sin recargar la página.
   const [inventario, setInventario] = useState<any[]>(products || []);
-  const [productoId, setProductoId] = useState('');
-  const [plantaId, setPlantaId] = useState('');
-  const [metodo, setMetodo] = useState('');
+  // Los valores iniciales llegan por URL desde la ficha de la planta o desde el
+  // diagnóstico por foto, que encadena aquí con todo pre-rellenado.
+  const [productoId, setProductoId] = useState(defaults?.productId || '');
+  const [plantaId, setPlantaId] = useState(defaults?.plantId || '');
+  const [metodo, setMetodo] = useState(defaults?.metodo || '');
   const [avisoEscaner, setAvisoEscaner] = useState<string | null>(null);
 
-  const [frecuencia, setFrecuencia] = useState('');
+  const [frecuencia, setFrecuencia] = useState(() => {
+    const p = (products || []).find((x: { id: string; frequency_days?: number | null }) => x.id === defaults?.productId);
+    return p?.frequency_days ? String(p.frequency_days) : '';
+  });
   // Si el usuario escribe la frecuencia a mano, ninguna sugerencia se la pisa.
   const frecuenciaTocada = useRef(false);
   const [sugerencia, setSugerencia] = useState<Sugerencia | null>(null);
@@ -279,6 +291,7 @@ export default function NewEventForm({ plants, products, today }: { plants: any[
           name="notes"
           rows={3}
           ref={notasRef}
+          defaultValue={defaults?.notas || ''}
           placeholder="Ej: Vi bastante oidio en las ramas bajas..."
           className="input-field"
         />

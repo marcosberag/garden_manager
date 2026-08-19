@@ -39,6 +39,13 @@ export default async function HomePage() {
       {/* Mapa: el gemelo de la parcela */}
       <div className="home-map">
         <MapWrapper plants={plants || []} initialParcel={parcel?.geojson ? JSON.parse(parcel.geojson) : null} />
+        <Link
+          href="/recorrido"
+          className="chip-btn chip-btn--primary"
+          style={{ position: 'absolute', top: '12px', left: '12px', zIndex: 1000, boxShadow: '0 2px 8px rgba(9,53,46,0.25)' }}
+        >
+          ◉ Recorrido
+        </Link>
       </div>
 
       {/* Panel de agenda */}

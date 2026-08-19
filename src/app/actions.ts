@@ -1036,3 +1036,104 @@ export async function terminarTratamiento(eventId: string) {
   revalidatePath('/');
   revalidatePath('/calendar');
 }
+
+/**
+ * Guarda el resultado de un recorrido con cámara por el jardín. Cada detección
+ * crea una planta nueva (con su foto y su posición GPS si la hay) o completa
+ * una ya registrada: a las existentes solo se les rellena lo que les falte
+ * (foto, posición), nunca se les pisa nada.
+ */
+export async function guardarRecorrido(detecciones: {
+  nombre: string;
+  especie: string;
+  descripcion: string | null;
+  foto: string | null; // dataURL JPEG capturado durante el recorrido
+  lat: number | null;
+  lng: number | null;
+  plantaExistenteId: string | null;
+}[]): Promise<{ creadas: string[]; actualizadas: string[]; errores: string[] }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { creadas: [], actualizadas: [], errores: ['Usuario no autenticado'] };
+
+  const creadas: string[] = [];
+  const actualizadas: string[] = [];
+  const errores: string[] = [];
+
+  const subirFoto = async (dataUrl: string): Promise<string | null> => {
+    const base64 = dataUrl.split(',')[1];
+    if (!base64) return null;
+    const buffer = Buffer.from(base64, 'base64');
+    const filePath = `${user.id}/${Math.random().toString(36).substring(2, 15)}.jpg`;
+    const { error } = await supabase.storage
+      .from('plant_images')
+      .upload(filePath, buffer, { contentType: 'image/jpeg' });
+    if (error) {
+      console.error('Error subiendo la foto del recorrido:', error);
+      return null;
+    }
+    return supabase.storage.from('plant_images').getPublicUrl(filePath).data.publicUrl;
+  };
+
+  for (const d of detecciones.slice(0, 60)) {
+    const nombre = d.nombre?.trim() || d.especie?.trim();
+    if (!nombre) {
+      errores.push('Una detección venía sin nombre ni especie y se ha saltado.');
+      continue;
+    }
+
+    try {
+      if (d.plantaExistenteId) {
+        // Completar la planta ya registrada sin pisar lo que ya tiene.
+        const { data: existente } = await supabase
+          .from('plants')
+          .select('id, name, image_url, lat, lng, path')
+          .match({ id: d.plantaExistenteId, user_id: user.id })
+          .single();
+        if (!existente) {
+          errores.push(`${nombre}: la planta registrada a la que apuntaba ya no existe.`);
+          continue;
+        }
+        const cambios: any = {};
+        if (!existente.image_url && d.foto) {
+          const url = await subirFoto(d.foto);
+          if (url) cambios.image_url = url;
+        }
+        if (existente.lat == null && !existente.path && d.lat != null && d.lng != null) {
+          cambios.lat = d.lat;
+          cambios.lng = d.lng;
+        }
+        if (Object.keys(cambios).length > 0) {
+          await supabase.from('plants').update(cambios).match({ id: existente.id, user_id: user.id });
+        }
+        actualizadas.push(existente.name);
+      } else {
+        const image_url = d.foto ? await subirFoto(d.foto) : null;
+        const icon_category = await resolverCategoria(d.especie, nombre);
+        const { error } = await supabase.from('plants').insert({
+          user_id: user.id,
+          name: nombre,
+          species: d.especie?.trim() || null,
+          description: d.descripcion?.trim() || null,
+          icon_category,
+          image_url,
+          lat: d.lat,
+          lng: d.lng,
+        });
+        if (error) {
+          console.error('Error guardando planta del recorrido:', error);
+          errores.push(`${nombre}: no se pudo guardar.`);
+        } else {
+          creadas.push(nombre);
+        }
+      }
+    } catch (e) {
+      console.error('Error procesando detección del recorrido:', e);
+      errores.push(`${nombre}: error inesperado.`);
+    }
+  }
+
+  revalidatePath('/');
+  revalidatePath('/plants');
+  return { creadas, actualizadas, errores };
+}
