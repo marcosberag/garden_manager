@@ -16,8 +16,8 @@ export const CATEGORIAS = [
 
 export type CategoriaPlanta = (typeof CATEGORIAS)[number];
 
-const VERDE = '#778643';
-const VERDE_OSCURO = '#5c6835';
+const VERDE = '#77aa83';
+const VERDE_OSCURO = '#117025';
 const TIERRA = '#8a6f4a';
 
 // Cada dibujo ocupa un lienzo de 24x24 y se apoya en la línea de suelo (y=21).
@@ -126,7 +126,7 @@ export function pinDePlanta(categoria?: string | null): string {
       </filter>
     </defs>
     <path d="M20 1C10.6 1 3 8.6 3 18c0 11.4 13.6 22.8 16.1 32.3.2.9 1.6.9 1.8 0C23.4 40.8 37 29.4 37 18 37 8.6 29.4 1 20 1z"
-          fill="#ffffff" stroke="${VERDE}" stroke-width="2.5" filter="url(#sombra-pin)"/>
+          fill="#ffffff" stroke="#09352e" stroke-width="2.5" filter="url(#sombra-pin)"/>
     <g transform="translate(8 6)">${DIBUJOS[elegida]}</g>
   </svg>`;
 }

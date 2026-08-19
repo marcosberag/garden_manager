@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Tu jardín, con seguimiento inteligente de plantas y tratamientos.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#e0e0e0',
+    background_color: '#e7eae6',
     theme_color: '#09352e',
     icons: [
       { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },

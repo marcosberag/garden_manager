@@ -1,63 +1,102 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400&family=Inter:wght@300;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ---------------------------------------------------------------------------
+   Brotes — sistema visual "botanist's data terminal" (ver DESIGN.md).
+   Lienzo salvia con retícula de puntos, tarjetas blancas con borde hairline,
+   una sola acción rellena en menta y etiquetas monoespaciadas tipo espécimen.
+
+   Los nombres de token antiguos (--color-eucalyptus, --color-ink-black...)
+   se conservan como alias de la paleta nueva: así todos los estilos inline
+   repartidos por la app cambian de tinta sin tocarlos uno a uno.
+   --------------------------------------------------------------------------- */
 
 :root {
-  /* Colors */
-  --color-eucalyptus: #778643;
-  --gradient-eucalyptus: radial-gradient(ellipse at 50% 50%, rgba(119,134,67,0.35) 0%, rgba(119,134,67,0.08) 50%, #ffffff 100%);
-  --color-ink-black: #000000;
-  --color-pure-canvas: #ffffff;
-  --color-graphite: #4e4e4e;
-  --color-mist: #c8c8c8;
+  /* Paleta DESIGN.md */
+  --color-forest-ink: #09352e;
+  --color-bone-white: #ffffff;
+  --color-sage-paper: #e7eae6;
+  --color-ash-gray: #eceeeb;
+  --color-muted-sage: #77aa83;
+  --color-lichen: #cad3d2;
+  --color-slate-smoke: #6c7a79;
+  --color-charcoal-bark: #29211e;
+  --color-moss: #85c093;
+  --color-deep-fern: #007010;
+  --color-pine: #117025;
+  --color-emerald: #008023;
+  --color-indigo-accent: #433787;
+
+  /* Alias heredados: el resto de la app los usa en estilos inline */
+  --color-eucalyptus: var(--color-pine);
+  --color-ink-black: var(--color-forest-ink);
+  --color-pure-canvas: var(--color-bone-white);
+  --color-graphite: var(--color-slate-smoke);
+  --color-mist: var(--color-lichen);
+  --color-fog: var(--color-ash-gray);
+  --color-alert: #b3402a;
+  --color-alert-wash: #f6e9e5;
 
   /* Typography — Font Families */
-  --font-space-regular: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
-  --font-suisse-intl: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-space-grotesk: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-denim: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
+  /* Alias heredados */
+  --font-space-regular: var(--font-denim);
+  --font-suisse-intl: var(--font-denim);
+  --font-space-grotesk: var(--font-denim);
 
-  /* Typography — Scale */
-  --text-body: 15px;
-  --leading-body: 1.3;
-  --text-subheading: 34px;
-  --leading-subheading: 1.1;
-  --text-heading-sm: 45px;
-  --leading-heading-sm: 1.1;
-  --text-heading: 75px;
-  --leading-heading: 1;
-  --text-display: 90px;
-  --leading-display: 1;
+  /* Typography — Scale (compacta, ver DESIGN.md) */
+  --text-caption: 11px;
+  --text-body: 14px;
+  --leading-body: 1.5;
+  --text-body-lg: 16px;
+  --text-subheading: 20px;
+  --leading-subheading: 1.35;
+  --text-heading-sm: 24px;
+  --leading-heading-sm: 1.25;
+  --text-heading: 32px;
+  --leading-heading: 1.17;
+  --text-display: 48px;
+  --leading-display: 1.11;
 
-  /* Typography — Weights */
-  --font-weight-light: 300;
+  /* Typography — Weights (el sistema no usa 300) */
+  --font-weight-light: 400;
   --font-weight-regular: 400;
+  --font-weight-medium: 500;
 
   /* Spacing */
   --spacing-4: 4px;
   --spacing-8: 8px;
-  --spacing-11: 11px;
+  --spacing-11: 8px;
   --spacing-12: 12px;
-  --spacing-15: 15px;
-  --spacing-19: 19px;
-  --spacing-23: 23px;
-  --spacing-30: 30px;
-  --spacing-38: 38px;
-  --spacing-45: 45px;
-  --spacing-60: 60px;
-  --spacing-75: 75px;
-  --spacing-83: 83px;
-  --spacing-120: 120px;
+  --spacing-15: 16px;
+  --spacing-19: 20px;
+  --spacing-23: 24px;
+  --spacing-30: 32px;
+  --spacing-38: 40px;
+  --spacing-45: 48px;
+  --spacing-60: 64px;
+  --spacing-75: 64px;
+  --spacing-83: 80px;
+  --spacing-120: 100px;
 
   /* Layout */
-  --page-max-width: 1200px;
-  --section-gap: 75px;
-  --card-padding: 30px;
-  --element-gap: 23px;
+  --page-max-width: 1280px;
+  --section-gap: 48px;
+  --card-padding: 20px;
+  --element-gap: 8px;
+  --topbar-height: 60px;
 
   /* Border Radius */
-  --radius-xl: 15px;
-  --radius-2xl: 22.5px;
-  --radius-cards: 15px;
-  --radius-images: 15px;
-  --radius-buttons: 22.5px;
+  --radius-tags: 4px;
+  --radius-xl: 12px;
+  --radius-2xl: 18px;
+  --radius-cards: 12px;
+  --radius-images: 12px;
+  --radius-buttons: 12px;
+
+  /* Sombras: hairlines interiores en vez de elevación */
+  --shadow-subtle: rgb(202, 211, 210) 0px 0px 0px 1px inset;
+  --shadow-card-hover: rgba(9, 53, 45, 0.05) 0px 5px 6px -4px, rgba(174, 202, 197, 0.08) 0px 1px 1px 0.5px;
 }
 
 * {
@@ -67,47 +106,46 @@
 }
 
 body {
-  background-color: var(--color-pure-canvas);
-  color: var(--color-ink-black);
-  font-family: var(--font-space-grotesk);
+  background-color: var(--color-sage-paper);
+  /* Retícula de puntos en Lichen: el papel milimetrado del herbario */
+  background-image: radial-gradient(var(--color-lichen) 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--color-forest-ink);
+  font-family: var(--font-denim);
   font-size: var(--text-body);
   line-height: var(--leading-body);
+  letter-spacing: 0.012em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Oevra Page Gradient Wash */
+/* El lavado degradado de la plantilla vieja ya no existe: el lienzo es el body */
 .page-wash {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: var(--gradient-eucalyptus);
-  z-index: -1;
-  pointer-events: none;
+  display: none;
 }
 
 .container {
   max-width: var(--page-max-width);
   margin: 0 auto;
-  padding: 0 var(--spacing-30);
+  padding: 0 var(--spacing-23);
   width: 100%;
 }
 
 h1, h2, h3, h4, .suisse {
-  font-family: var(--font-suisse-intl);
-  font-weight: var(--font-weight-light);
+  font-family: var(--font-denim);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-forest-ink);
+  letter-spacing: -0.01em;
 }
 
 .display-text {
   font-size: var(--text-display);
   line-height: var(--leading-display);
-  color: var(--color-pure-canvas);
+  color: var(--color-forest-ink);
 }
 
 .display-text.on-white {
-  color: var(--color-eucalyptus);
+  color: var(--color-forest-ink);
 }
 
 .heading-text {
@@ -121,11 +159,11 @@ h1, h2, h3, h4, .suisse {
 }
 
 p, .body-text {
-  color: var(--color-graphite);
+  color: var(--color-slate-smoke);
   font-size: var(--text-body);
   line-height: var(--leading-body);
-  font-family: var(--font-space-grotesk);
-  max-width: 45ch;
+  font-family: var(--font-denim);
+  max-width: 58ch;
 }
 
 .section {
@@ -133,47 +171,126 @@ p, .body-text {
   position: relative;
 }
 
-/* Buttons */
+/* ---------------------------------------------------------------------------
+   Botones. Una sola acción rellena por pantalla (menta); el resto, contorno
+   o fantasma. Radio 12px en todos.
+   --------------------------------------------------------------------------- */
+
 button {
   cursor: pointer;
   border: none;
   background: transparent;
-  font-family: var(--font-space-grotesk);
+  font-family: var(--font-denim);
+}
+
+.btn-solid,
+.btn-filled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-buttons);
+  background-color: var(--color-moss);
+  color: var(--color-forest-ink);
+  border: 1px solid var(--color-moss);
+  padding: 11px 20px;
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-solid:hover:not(:disabled),
+.btn-filled:hover:not(:disabled) {
+  background-color: #74b384;
+  border-color: #74b384;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-buttons);
+  background-color: transparent;
+  color: var(--color-forest-ink);
+  border: 1px solid var(--color-forest-ink);
+  padding: 11px 20px;
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-forest-ink);
+  color: var(--color-bone-white);
 }
 
 .btn-ghost {
-  border-radius: var(--radius-buttons);
-  border: 1px solid currentColor;
-  padding: var(--spacing-11) var(--spacing-23);
-  font-size: var(--text-body);
-  color: inherit;
-  transition: opacity 0.2s;
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-8);
+  gap: 8px;
+  border-radius: var(--radius-buttons);
+  border: 1px solid var(--color-lichen);
+  background-color: transparent;
+  color: var(--color-forest-ink);
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .btn-ghost:hover {
-  opacity: 0.7;
+  border-color: var(--color-forest-ink);
+  background-color: var(--color-bone-white);
 }
 
-.btn-filled {
+.btn-solid:disabled,
+.btn-outline:disabled,
+.btn-filled:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Botones de escáner (cámara y galería) */
+.btn-scan {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-radius: var(--radius-buttons);
-  background-color: var(--color-eucalyptus);
-  color: var(--color-pure-canvas);
-  padding: var(--spacing-11) var(--spacing-23);
-  font-size: var(--text-body);
-  transition: opacity 0.2s;
+  padding: 11px 15px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-deep-fern);
+  border: 1px solid var(--color-lichen);
+  background-color: var(--color-bone-white);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.btn-filled:hover {
-  opacity: 0.8;
+.btn-scan:hover:not(:disabled) {
+  border-color: var(--color-deep-fern);
 }
 
-/* Hairline dividers */
+.btn-scan:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Hairlines, tarjetas, imágenes
+   --------------------------------------------------------------------------- */
+
 .hairline {
   height: 1px;
-  background-color: var(--color-ink-black);
+  background-color: var(--color-lichen);
   width: 100%;
   border: none;
 }
@@ -184,14 +301,14 @@ button {
 }
 
 .hairline.graphite {
-  background-color: var(--color-graphite);
+  background-color: var(--color-lichen);
 }
 
-/* Cards & Images */
 .card {
   border-radius: var(--radius-cards);
-  background: var(--color-pure-canvas);
-  border: 1px solid var(--color-mist);
+  background: var(--color-bone-white);
+  border: none;
+  box-shadow: var(--shadow-subtle);
   padding: var(--card-padding);
 }
 
@@ -209,101 +326,26 @@ button {
   margin: 0 var(--spacing-12);
 }
 
-/* Scroll indicator */
-.scroll-indicator {
-  position: fixed;
-  left: var(--spacing-30);
-  bottom: 50%;
-  transform: rotate(-90deg);
-  transform-origin: left bottom;
-  font-size: 12px;
-  text-transform: uppercase;
-  color: var(--color-ink-black);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-8);
-}
-
-.scroll-indicator::before {
-  content: '';
-  display: block;
-  width: 30px;
-  height: 1px;
-  background: currentColor;
-}
-
 /* ---------------------------------------------------------------------------
-   Formularios y acciones. Estas tres clases se usan por toda la app desde el
-   principio pero nunca llegaron a definirse: cada boton salia transparente y
-   con el estilo que tuviera puesto inline. Aqui esta su unica definicion.
+   Formularios
    --------------------------------------------------------------------------- */
-
-:root {
-  /* Papel de los paneles: mas calido y claro que --color-mist, que es un gris
-     de borde y aplastaba los bloques que lo usaban de fondo. */
-  --color-fog: #f4f3ee;
-  --color-alert: #b3402a;
-  --color-alert-wash: #f9ece8;
-}
-
-.btn-solid,
-.btn-outline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border-radius: 0;
-  padding: 15px 23px;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.btn-solid {
-  background-color: var(--color-ink-black);
-  color: var(--color-pure-canvas);
-  border: 1px solid var(--color-ink-black);
-}
-
-.btn-solid:hover:not(:disabled) {
-  background-color: var(--color-eucalyptus);
-  border-color: var(--color-eucalyptus);
-}
-
-.btn-outline {
-  background-color: transparent;
-  color: var(--color-ink-black);
-  border: 1px solid var(--color-ink-black);
-}
-
-.btn-outline:hover:not(:disabled) {
-  background-color: var(--color-ink-black);
-  color: var(--color-pure-canvas);
-}
-
-.btn-solid:disabled,
-.btn-outline:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 
 .input-field {
   width: 100%;
-  padding: 15px;
-  border: 1px solid var(--color-mist);
-  border-radius: 0;
-  background-color: var(--color-pure-canvas);
-  color: var(--color-ink-black);
-  font-family: inherit;
-  font-size: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-lichen);
+  border-radius: 8px;
+  background-color: var(--color-bone-white);
+  color: var(--color-forest-ink);
+  font-family: var(--font-denim);
+  font-size: 16px; /* evita el zoom automático de iOS al enfocar */
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input-field:focus {
-  border-color: var(--color-eucalyptus);
+  border-color: var(--color-deep-fern);
+  box-shadow: 0 0 0 3px rgba(0, 112, 16, 0.08);
 }
 
 textarea.input-field {
@@ -311,54 +353,282 @@ textarea.input-field {
 }
 
 .field-label {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--color-graphite);
+  letter-spacing: 0.18em;
+  color: var(--color-slate-smoke);
 }
 
 .field-hint {
   font-size: 11px;
-  color: var(--color-graphite);
+  color: var(--color-slate-smoke);
   margin: 0;
   line-height: 1.4;
 }
 
-/* Cejilla: la etiqueta pequena en eucalipto que anuncia de donde sale un dato
-   (la pauta calculada, la lectura de una etiqueta...). */
+/* Cejilla: anuncia de dónde sale un dato (pauta calculada, lectura de
+   etiqueta...). Es la etiqueta de espécimen del sistema. */
 .eyebrow {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--color-eucalyptus);
+  letter-spacing: 0.22em;
+  color: var(--color-deep-fern);
 }
 
-/* Botones de escaner (camara y galeria): accion secundaria en eucalipto. */
-.btn-scan {
-  flex: 1;
+/* ---------------------------------------------------------------------------
+   Etiquetas y chips de la agenda. Todo el estado se dice con la familia verde
+   y un único terracota para lo atrasado — nada de arcoíris.
+   --------------------------------------------------------------------------- */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 3px 8px;
+  border-radius: var(--radius-tags);
+  border: 1px solid var(--color-lichen);
+  background-color: var(--color-bone-white);
+  color: var(--color-slate-smoke);
+  white-space: nowrap;
+}
+
+.tag--fern {
+  color: var(--color-deep-fern);
+  border-color: rgba(0, 112, 16, 0.35);
+}
+
+.tag--ink {
+  color: var(--color-bone-white);
+  background-color: var(--color-forest-ink);
+  border-color: var(--color-forest-ink);
+}
+
+.tag--alert {
+  color: var(--color-alert);
+  border-color: rgba(179, 64, 42, 0.4);
+  background-color: var(--color-alert-wash);
+}
+
+.tag--muted {
+  color: var(--color-slate-smoke);
+  background-color: var(--color-ash-gray);
+  border-color: transparent;
+}
+
+.chip-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 0;
-  padding: 12px 15px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 1.5px;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-eucalyptus);
-  border: 1px solid var(--color-eucalyptus);
-  background-color: transparent;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-lichen);
+  background-color: var(--color-bone-white);
+  color: var(--color-forest-ink);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.btn-scan:hover:not(:disabled) {
-  background-color: var(--color-eucalyptus);
-  color: var(--color-pure-canvas);
+.chip-btn:hover:not(:disabled) {
+  border-color: var(--color-forest-ink);
 }
 
-.btn-scan:disabled {
+.chip-btn--primary {
+  background-color: var(--color-moss);
+  border-color: var(--color-moss);
+}
+
+.chip-btn--primary:hover:not(:disabled) {
+  background-color: #74b384;
+  border-color: #74b384;
+}
+
+.chip-btn--danger {
+  color: var(--color-alert);
+}
+
+.chip-btn--danger:hover:not(:disabled) {
+  border-color: var(--color-alert);
+}
+
+.chip-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Barra superior
+   --------------------------------------------------------------------------- */
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: var(--topbar-height);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  background-color: rgba(231, 234, 230, 0.88);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 0 0 var(--color-lichen);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-forest-ink);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.topbar-links {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar-links::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--color-forest-ink);
+  white-space: nowrap;
+}
+
+.topbar-link:hover {
+  color: var(--color-deep-fern);
+}
+
+/* ---------------------------------------------------------------------------
+   Home: mapa + panel de agenda. En escritorio, panel fijo a la derecha; en
+   móvil se apilan y la página hace scroll normal.
+   --------------------------------------------------------------------------- */
+
+.home-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  padding-top: var(--topbar-height);
+  display: flex;
+}
+
+.home-map {
+  flex: 1 1 62%;
+  position: relative;
+}
+
+.home-panel {
+  flex: 0 0 400px;
+  background-color: var(--color-bone-white);
+  border-left: 1px solid var(--color-lichen);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.home-panel-head {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-lichen);
+  background-color: var(--color-bone-white);
+}
+
+.home-panel-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-forest-ink);
+  margin: 0;
+}
+
+.home-panel-body {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+  background-color: var(--color-bone-white);
+}
+
+@media (max-width: 900px) {
+  .home-shell {
+    position: static;
+    height: auto;
+    min-height: 100vh;
+    flex-direction: column;
+  }
+
+  .home-map {
+    flex: none;
+    height: 44vh;
+  }
+
+  .home-panel {
+    flex: none;
+    border-left: none;
+    border-top: 1px solid var(--color-lichen);
+  }
+
+  .home-panel-body {
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --text-heading: 26px;
+    --text-display: 34px;
+    --section-gap: 32px;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    gap: 10px;
+  }
+
+  .topbar-links {
+    gap: 12px;
+  }
 }

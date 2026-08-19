@@ -76,11 +76,11 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
                   const isUrgent = rec.date <= todayStr;
                   return (
                     <div key={idx} style={{ 
-                      backgroundColor: 'white', padding: '15px', borderLeft: `3px solid ${isUrgent ? '#E74C3C' : 'var(--color-eucalyptus)'}`
+                      backgroundColor: 'white', padding: '15px', borderLeft: `3px solid ${isUrgent ? 'var(--color-alert)' : 'var(--color-eucalyptus)'}`
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{rec.products?.name ? rec.products.name : rec.type}</span>
-                        <span style={{ fontSize: '14px', color: isUrgent ? '#E74C3C' : 'var(--color-ink-black)', fontWeight: 'bold' }}>{rec.date}</span>
+                        <span style={{ fontSize: '14px', color: isUrgent ? 'var(--color-alert)' : 'var(--color-ink-black)', fontWeight: 'bold' }}>{rec.date}</span>
                       </div>
                       <p style={{ fontSize: '12px', color: 'var(--color-graphite)', margin: 0 }}>{rec.notes}</p>
                     </div>
@@ -100,7 +100,7 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {pastEvents?.map(event => (
-                <div key={event.id} style={{ backgroundColor: 'white', padding: '15px', border: '1px solid #e0e0e0' }}>
+                <div key={event.id} style={{ backgroundColor: 'white', padding: '15px', border: '1px solid var(--color-lichen)', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                     <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{event.products?.name ? event.products.name : event.type}</span>
                     <span style={{ fontSize: '13px', color: 'var(--color-graphite)' }}>{event.date}</span>

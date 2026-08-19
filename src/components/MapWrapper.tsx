@@ -392,7 +392,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                         setTimeout(() => calleRef.current?.focus(), 10);
                       }}
                       style={{
-                        padding: '10px 15px', fontSize: '12px', borderBottom: '1px solid #eee',
+                        padding: '10px 15px', fontSize: '12px', borderBottom: '1px solid var(--color-lichen)',
                         cursor: 'pointer', color: 'var(--color-graphite)',
                         backgroundColor: idx === selectedIndex ? 'var(--color-mist)' : 'transparent'
                       }}
@@ -448,7 +448,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                         setTimeout(() => numeroRef.current?.focus(), 10);
                       }}
                       style={{
-                        padding: '10px 15px', fontSize: '12px', borderBottom: '1px solid #eee',
+                        padding: '10px 15px', fontSize: '12px', borderBottom: '1px solid var(--color-lichen)',
                         cursor: 'pointer', color: 'var(--color-graphite)',
                         backgroundColor: idx === selectedIndex ? 'var(--color-mist)' : 'transparent'
                       }}
@@ -481,7 +481,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
               {isSearching ? 'BUSCANDO...' : 'EXTRAER PARCELA'}
             </button>
             <div style={{ textAlign: 'center', marginTop: '15px' }}>
-              <p style={{ fontSize: '12px', color: '#666', margin: '0 0 10px 0' }}>¿No encuentras tu dirección exacta?</p>
+              <p style={{ fontSize: '12px', color: 'var(--color-slate-smoke)', margin: '0 0 10px 0' }}>¿No encuentras tu dirección exacta?</p>
               <button 
                 type="button"
                 onClick={() => setHideSearchForm(true)}
@@ -506,7 +506,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
           </p>
           <button 
             onClick={() => setHideSearchForm(false)}
-            style={{ background: 'none', border: '1px solid #ccc', borderRadius: '4px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer' }}
+            style={{ background: 'none', border: '1px solid var(--color-lichen)', borderRadius: '4px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer' }}
           >
             Volver al buscador
           </button>
@@ -544,7 +544,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                         width: '100%',
                         padding: '10px',
                         backgroundColor: selectedPlantId === p.id ? 'var(--color-mist)' : 'white',
-                        border: `1px solid ${selectedPlantId === p.id ? 'var(--color-eucalyptus)' : '#eee'}`,
+                        border: `1px solid ${selectedPlantId === p.id ? 'var(--color-eucalyptus)' : 'var(--color-lichen)'}`,
                         borderRadius: '8px',
                         cursor: 'pointer',
                         textAlign: 'left',
@@ -565,13 +565,13 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                       <div style={{ display: 'flex', gap: '5px', paddingLeft: '5px' }}>
                         <button 
                           onClick={() => { setPlacementType('point'); setDrawingPath([]); }}
-                          style={{ flex: 1, padding: '4px', fontSize: '10px', borderRadius: '4px', border: '1px solid', borderColor: placementType === 'point' ? 'var(--color-eucalyptus)' : '#ccc', backgroundColor: placementType === 'point' ? 'var(--color-eucalyptus)' : 'white', color: placementType === 'point' ? 'white' : '#666', cursor: 'pointer' }}
+                          style={{ flex: 1, padding: '4px', fontSize: '10px', borderRadius: '4px', border: '1px solid', borderColor: placementType === 'point' ? 'var(--color-eucalyptus)' : 'var(--color-lichen)', backgroundColor: placementType === 'point' ? 'var(--color-eucalyptus)' : 'white', color: placementType === 'point' ? 'white' : 'var(--color-slate-smoke)', cursor: 'pointer' }}
                         >
                           PUNTO
                         </button>
                         <button 
                           onClick={() => { setPlacementType('line'); setDrawingPath([]); }}
-                          style={{ flex: 1, padding: '4px', fontSize: '10px', borderRadius: '4px', border: '1px solid', borderColor: placementType === 'line' ? 'var(--color-eucalyptus)' : '#ccc', backgroundColor: placementType === 'line' ? 'var(--color-eucalyptus)' : 'white', color: placementType === 'line' ? 'white' : '#666', cursor: 'pointer' }}
+                          style={{ flex: 1, padding: '4px', fontSize: '10px', borderRadius: '4px', border: '1px solid', borderColor: placementType === 'line' ? 'var(--color-eucalyptus)' : 'var(--color-lichen)', backgroundColor: placementType === 'line' ? 'var(--color-eucalyptus)' : 'white', color: placementType === 'line' ? 'white' : 'var(--color-slate-smoke)', cursor: 'pointer' }}
                         >
                           LÍNEA
                         </button>

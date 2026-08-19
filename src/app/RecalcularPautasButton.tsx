@@ -50,13 +50,9 @@ export default function RecalcularPautasButton() {
       <button
         onClick={() => setFase('confirmar')}
         disabled={fase === 'trabajando'}
-        style={{
-          color: 'white', backgroundColor: 'transparent', border: '1px solid var(--color-eucalyptus)',
-          fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', letterSpacing: '1px',
-          borderRadius: '4px', cursor: 'pointer', opacity: fase === 'trabajando' ? 0.5 : 1,
-        }}
+        className="chip-btn"
       >
-        {fase === 'trabajando' ? 'RECALCULANDO…' : 'PAUTAS IA'}
+        {fase === 'trabajando' ? 'Recalculando…' : 'Pautas IA'}
       </button>
 
       {(fase === 'confirmar' || fase === 'resultado') && (

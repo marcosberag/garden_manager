@@ -33,7 +33,7 @@ interface Plant {
   path?: [number, number][];
 }
 
-const VERDE_APP = '#778643';
+const VERDE_APP = '#117025';
 
 interface MapComponentProps {
   plants: Plant[];
@@ -84,9 +84,9 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
 
   // Si hay parcela, el estilo del polígono
   const parcelStyle = {
-    fillColor: '#2B5329', // Elegante verde oscuro (eucalyptus)
-    fillOpacity: 0.15,
-    color: '#2B5329', // Borde sólido y nítido
+    fillColor: '#77aa83', // Salvia apagada: lavado suave, como lámina de herbario
+    fillOpacity: 0.18,
+    color: '#09352e', // Borde en tinta bosque, sólido y nítido
     weight: 2,
   };
 
@@ -118,7 +118,7 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
           height: '100%', 
           width: '100%', 
           cursor: onLocationSelect && !parcel ? 'crosshair' : (selectingMode && parcel ? 'crosshair' : 'grab'),
-          backgroundColor: parcel ? 'var(--color-pure-canvas, #F9F8F6)' : '#ddd'
+          backgroundColor: parcel ? 'var(--color-pure-canvas, #ffffff)' : 'var(--color-sage-paper, #e7eae6)'
         }}
         ref={mapRef}
         whenReady={() => setMapReady(true)}
@@ -205,9 +205,9 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
                   )}
                   
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '15px' }}>
-                    {plant.location && <span style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: '#f0f0f0', borderRadius: '4px', color: '#333' }}>📍 {plant.location}</span>}
-                    {plant.age && <span style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: '#f0f0f0', borderRadius: '4px', color: '#333' }}>⏳ {plant.age}</span>}
-                    {plant.size && <span style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: '#f0f0f0', borderRadius: '4px', color: '#333' }}>📏 {plant.size}</span>}
+                    {plant.location && <span style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: 'var(--color-ash-gray)', borderRadius: '4px', color: 'var(--color-forest-ink)' }}>📍 {plant.location}</span>}
+                    {plant.age && <span style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: 'var(--color-ash-gray)', borderRadius: '4px', color: 'var(--color-forest-ink)' }}>⏳ {plant.age}</span>}
+                    {plant.size && <span style={{ fontSize: '11px', padding: '4px 8px', backgroundColor: 'var(--color-ash-gray)', borderRadius: '4px', color: 'var(--color-forest-ink)' }}>📏 {plant.size}</span>}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

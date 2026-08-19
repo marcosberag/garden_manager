@@ -19,9 +19,9 @@ export default function MarkCuredButton({ plantId }: { plantId: string }) {
       <button 
         onClick={() => setShowConfirm(true)}
         disabled={loading}
-        style={{ fontSize: '11px', padding: '8px 15px', color: '#117A65', backgroundColor: '#E8F6F3', border: '1px solid #117A65', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', opacity: loading ? 0.5 : 1 }}
+        className="chip-btn chip-btn--primary"
       >
-        {loading ? 'MARCANDO...' : '✓ MARCAR PLANTA CURADA'}
+        {loading ? 'Marcando…' : '✓ Marcar planta curada'}
       </button>
 
       {showConfirm && (
@@ -53,7 +53,7 @@ export default function MarkCuredButton({ plantId }: { plantId: string }) {
                 type="button"
                 onClick={handleCured}
                 className="btn-solid"
-                style={{ padding: '8px 16px', fontSize: '14px', backgroundColor: '#117A65', color: 'white' }}
+                style={{ padding: '8px 16px', fontSize: '14px' }}
               >
                 Sí, Marcar Curada
               </button>

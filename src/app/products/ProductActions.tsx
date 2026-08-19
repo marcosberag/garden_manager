@@ -28,7 +28,7 @@ export default function ProductActions({ id }: { id: string }) {
       {showConfirm ? (
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: 'var(--color-graphite)' }}>¿Seguro?</span>
-          <button onClick={handleDelete} disabled={isDeleting} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: '#ff4d4f', cursor: isDeleting ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+          <button onClick={handleDelete} disabled={isDeleting} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-alert)', cursor: isDeleting ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
             {isDeleting ? '...' : 'Sí, eliminar'}
           </button>
           <button onClick={() => setShowConfirm(false)} disabled={isDeleting} style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)', cursor: 'pointer' }}>

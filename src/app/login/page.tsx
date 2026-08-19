@@ -10,7 +10,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <main className="container" style={{ paddingTop: '120px', paddingBottom: '120px', display: 'flex', justifyContent: 'center' }}>
       
       <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '45px' }}>
-        <h1 className="heading-text suisse" style={{ color: 'var(--color-eucalyptus)', marginBottom: '15px', fontSize: '45px', lineHeight: '1.1' }}>
+        <h1 className="heading-text suisse" style={{ marginBottom: '15px' }}>
           bienvenido<br/>
           de nuevo.
         </h1>
@@ -19,32 +19,20 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </p>
 
         {message && (
-          <p style={{ color: 'var(--color-eucalyptus)', fontSize: '12px', marginBottom: '15px', padding: '11px', border: '1px solid var(--color-eucalyptus)', borderRadius: '15px' }}>
+          <p style={{ color: 'var(--color-deep-fern)', fontSize: '12px', marginBottom: '15px', padding: '11px', border: '1px solid var(--color-lichen)', borderRadius: '8px', backgroundColor: 'var(--color-ash-gray)' }}>
             {message}
           </p>
         )}
 
         <form style={{ display: 'flex', flexDirection: 'column', gap: '23px' }}>
           <div>
-            <label htmlFor="email" style={{ display: 'block', fontSize: '12px', color: 'var(--color-graphite)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Email</label>
-            <input 
-              id="email" 
-              name="email" 
-              type="email" 
-              required 
-              style={{ width: '100%', padding: '11px 15px', borderRadius: '15px', border: '1px solid var(--color-mist)', fontFamily: 'var(--font-space-grotesk)', fontSize: '15px', outline: 'none' }} 
-            />
+            <label htmlFor="email" className="field-label" style={{ display: 'block', marginBottom: '8px' }}>Email</label>
+            <input id="email" name="email" type="email" required className="input-field" />
           </div>
           
           <div>
-            <label htmlFor="password" style={{ display: 'block', fontSize: '12px', color: 'var(--color-graphite)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Contraseña</label>
-            <input 
-              id="password" 
-              name="password" 
-              type="password" 
-              required 
-              style={{ width: '100%', padding: '11px 15px', borderRadius: '15px', border: '1px solid var(--color-mist)', fontFamily: 'var(--font-space-grotesk)', fontSize: '15px', outline: 'none' }} 
-            />
+            <label htmlFor="password" className="field-label" style={{ display: 'block', marginBottom: '8px' }}>Contraseña</label>
+            <input id="password" name="password" type="password" required className="input-field" />
           </div>
 
           <div style={{ marginTop: '15px' }}>
@@ -56,7 +44,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <div style={{ marginTop: '30px', textAlign: 'center' }}>
           <span style={{ fontSize: '14px', color: 'var(--color-graphite)' }}>¿No tienes cuenta? </span>
-          <Link href="/register" style={{ fontSize: '14px', color: 'var(--color-eucalyptus)', textDecoration: 'none' }}>Crear cuenta</Link>
+          <Link href="/register" style={{ fontSize: '14px', color: 'var(--color-deep-fern)', textDecoration: 'none' }}>[ Crear cuenta ]</Link>
         </div>
       </div>
 

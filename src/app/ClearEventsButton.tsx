@@ -19,16 +19,12 @@ export default function ClearEventsButton() {
 
   return (
     <>
-      <button 
-        onClick={() => setShowConfirm(true)} 
+      <button
+        onClick={() => setShowConfirm(true)}
         disabled={loading}
-        style={{ 
-          color: '#E74C3C', backgroundColor: 'transparent', border: '1px solid #E74C3C', 
-          textDecoration: 'none', fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', 
-          borderRadius: '4px', cursor: 'pointer', opacity: loading ? 0.5 : 1 
-        }}
+        className="chip-btn chip-btn--danger"
       >
-        {loading ? 'BORRANDO...' : 'LIMPIAR'}
+        {loading ? 'Borrando…' : 'Limpiar'}
       </button>
 
       {showConfirm && (
@@ -56,11 +52,11 @@ export default function ClearEventsButton() {
               >
                 Cancelar
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={handleClear}
                 className="btn-solid"
-                style={{ padding: '8px 16px', fontSize: '14px', backgroundColor: 'var(--color-alert)' }}
+                style={{ padding: '8px 16px', fontSize: '14px', backgroundColor: 'var(--color-alert)', borderColor: 'var(--color-alert)', color: 'white' }}
               >
                 Sí, Borrar Todo
               </button>

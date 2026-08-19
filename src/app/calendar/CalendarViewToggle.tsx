@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
-import { markAsCured } from '@/app/actions';
 
 interface Recommendation {
   type: string;
@@ -53,47 +52,48 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
   const renderGrid = () => {
     const days = [];
-    
+
     // Celdas vacías al principio
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} style={{ padding: '10px', backgroundColor: '#f9f9f9', border: '1px solid #eee' }}></div>);
+      days.push(<div key={`empty-${i}`} style={{ padding: '10px', backgroundColor: 'var(--color-ash-gray)', border: '1px solid var(--color-lichen)' }}></div>);
     }
 
     // Días del mes
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
       const isToday = i === today.getDate();
-      
+
       const dayRecs = recommendations.filter(r => r.date === dateStr);
       const dayEvents = events.filter(e => e.date === dateStr);
 
       days.push(
-        <div key={i} style={{ 
-          padding: '5px', 
+        <div key={i} style={{
+          padding: '5px',
           minHeight: '70px',
-          backgroundColor: isToday ? '#F5FDF7' : 'white',
-          border: `1px solid ${isToday ? 'var(--color-eucalyptus)' : '#eee'}`,
+          backgroundColor: 'white',
+          border: `1px solid ${isToday ? 'var(--color-deep-fern)' : 'var(--color-lichen)'}`,
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
           overflow: 'hidden'
         }}>
-          <span style={{ 
-            fontSize: '11px', 
-            fontWeight: isToday ? 'bold' : 'normal',
-            color: isToday ? 'var(--color-eucalyptus)' : 'var(--color-graphite)',
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            fontWeight: isToday ? 500 : 400,
+            color: isToday ? 'var(--color-deep-fern)' : 'var(--color-slate-smoke)',
             marginBottom: '4px'
           }}>
             {i}
           </span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
             {dayEvents.map(e => (
-              <div key={e.id} style={{ fontSize: '9px', backgroundColor: '#E8F6F3', color: '#117A65', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${e.type} (Hecho)`}>
+              <div key={e.id} style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', backgroundColor: 'var(--color-ash-gray)', color: 'var(--color-deep-fern)', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${e.type} (Hecho)`}>
                 ✓ {e.type}
               </div>
             ))}
             {dayRecs.map((r, idx) => (
-              <div key={`rec-${idx}`} style={{ fontSize: '9px', backgroundColor: r.urgency === 'alta' ? '#FDEDEC' : 'var(--color-ink-black)', color: r.urgency === 'alta' ? '#E74C3C' : 'white', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.type}>
+              <div key={`rec-${idx}`} style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', backgroundColor: r.urgency === 'alta' ? 'var(--color-alert-wash)' : 'var(--color-forest-ink)', color: r.urgency === 'alta' ? 'var(--color-alert)' : 'white', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.type}>
                 {r.type}
               </div>
             ))}
@@ -104,28 +104,28 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: '20px' }}>
-        <h4 className="suisse" style={{ textAlign: 'center', margin: '0 0 15px 0', fontSize: '16px', color: 'var(--color-ink-black)' }}>
+        <h4 className="suisse" style={{ textAlign: 'center', margin: '0 0 15px 0', fontSize: '15px' }}>
           {monthNames[currentMonth]} {currentYear}
         </h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', borderBottom: '1px solid var(--color-lichen)', paddingBottom: '5px' }}>
           {dayNames.map(d => (
-            <div key={d} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 'bold', color: 'var(--color-graphite)' }}>{d}</div>
+            <div key={d} style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 500, color: 'var(--color-slate-smoke)' }}>{d}</div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', borderLeft: '1px solid #eee', borderTop: '1px solid #eee' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', borderLeft: '1px solid var(--color-lichen)', borderTop: '1px solid var(--color-lichen)' }}>
           {days}
         </div>
-        <div style={{ marginTop: '15px', display: 'flex', gap: '15px', justifyContent: 'center', fontSize: '10px', color: 'var(--color-graphite)' }}>
+        <div style={{ marginTop: '15px', display: 'flex', gap: '15px', justifyContent: 'center', fontSize: '10px', color: 'var(--color-slate-smoke)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: '10px', height: '10px', backgroundColor: '#E8F6F3', borderRadius: '2px' }}></div>
+            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-ash-gray)', border: '1px solid var(--color-lichen)', borderRadius: '2px' }}></div>
             <span>Registro</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-ink-black)', borderRadius: '2px' }}></div>
+            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-forest-ink)', borderRadius: '2px' }}></div>
             <span>Tarea Pendiente</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: '10px', height: '10px', backgroundColor: '#FDEDEC', borderRadius: '2px' }}></div>
+            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-alert-wash)', border: '1px solid var(--color-alert)', borderRadius: '2px' }}></div>
             <span>Urgente</span>
           </div>
         </div>
@@ -143,40 +143,40 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
   };
 
   const parseReason = (reason: string, frequencyDays?: number | null) => {
-    const tags: { text: string, color: string, bg: string }[] = [];
+    const tags: { text: string, className: string }[] = [];
     let cleanText = reason;
 
     if (cleanText.includes('[PROGRAMADO]')) {
-      tags.push({ text: 'PROGRAMADO', color: '#8E44AD', bg: '#F4ECF7' });
+      tags.push({ text: 'PROGRAMADO', className: 'tag' });
       cleanText = cleanText.replace(/\[PROGRAMADO\]/g, '');
     }
     if (cleanText.includes('[POSPUESTO]')) {
-      tags.push({ text: 'POSPUESTO', color: '#E67E22', bg: '#FEF5E7' });
+      tags.push({ text: 'POSPUESTO', className: 'tag tag--muted' });
       cleanText = cleanText.replace(/\[POSPUESTO\]/g, '');
     }
     if (cleanText.includes('[HECHO]')) {
-      tags.push({ text: 'HECHO', color: '#27AE60', bg: '#EAFAF1' });
+      tags.push({ text: 'HECHO', className: 'tag tag--fern' });
       cleanText = cleanText.replace(/\[HECHO\]/g, '');
     }
     if (cleanText.includes('[FIN]')) {
-      tags.push({ text: 'TERMINADO', color: '#7F8C8D', bg: '#F2F3F4' });
+      tags.push({ text: 'TERMINADO', className: 'tag tag--muted' });
       cleanText = cleanText.replace(/\[FIN\]/g, '');
     }
-    
+
     // La frecuencia viene de la columna del evento. Los eventos antiguos la
     // llevan escrita en el propio texto como "[FREQ:15] (Manual)": se lee de ahí
     // como respaldo y se limpia para que no salga en pantalla.
     const etiquetaAntigua = cleanText.match(/\[FREQ:(\d+)\]/);
     const dias = frequencyDays || (etiquetaAntigua ? parseInt(etiquetaAntigua[1], 10) : 0);
     if (dias > 0) {
-      tags.push({ text: `CADA ${dias} DÍAS`, color: '#2980B9', bg: '#EBF5FB' });
+      tags.push({ text: `CADA ${dias} DÍAS`, className: 'tag tag--fern' });
     }
     cleanText = cleanText
       .replace(/\[FREQ:\d+\]/g, '')
       .replace(/\(Manual\)/g, '')
       .replace(/\(\)/g, '')
       .trim();
-    
+
     return { cleanText, tags };
   };
 
@@ -212,56 +212,54 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
     if (combinedList.length === 0) {
       return (
-        <div style={{ padding: '30px', backgroundColor: 'var(--color-mist)', borderRadius: '8px', textAlign: 'center' }}>
-          <p className="body-text" style={{ margin: 0, fontSize: '14px' }}>No hay tareas pendientes ni historial. ¡Añade tu primer tratamiento!</p>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <p className="body-text" style={{ margin: '0 auto', fontSize: '13px' }}>No hay tareas pendientes ni historial. ¡Añade tu primer tratamiento!</p>
         </div>
       );
     }
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {combinedList.map((item, idx: number) => {
           const isUrgent = item.urgency === 'alta' && !item.isPast;
           const isToday = item.urgency === 'media' && !item.isPast;
-          const isFumigacion = item.type.toLowerCase().includes('fumig');
-          
-          let borderColor = isFumigacion ? 'var(--color-eucalyptus)' : '#F39C12';
-          let bgColor = 'white';
+
+          // Un solo acento cromático: terracota para lo atrasado. El resto de
+          // estados se dice en la familia verde-salvia.
+          let borderColor = 'var(--color-muted-sage)';
           if (item.isPast) {
-            borderColor = '#A6ACAF';
-            bgColor = '#F8F9F9';
+            borderColor = 'var(--color-lichen)';
           } else if (isUrgent) {
-            borderColor = '#E74C3C'; // Red
+            borderColor = 'var(--color-alert)';
           } else if (isToday) {
-            borderColor = '#3498DB'; // Blue for today
+            borderColor = 'var(--color-deep-fern)';
           }
+
+          const typeTagClass = item.isPast
+            ? 'tag tag--muted'
+            : (isUrgent ? 'tag tag--alert' : (isToday ? 'tag tag--ink' : 'tag'));
 
           const { cleanText, tags } = parseReason(item.reason, (item as { frequency_days?: number | null }).frequency_days);
 
           return (
-            <div key={idx} className="card" style={{ 
-              borderLeft: `4px solid ${borderColor}`,
-              backgroundColor: bgColor,
-              opacity: item.isPast ? 0.8 : 1,
+            <div key={idx} className="card" style={{
+              borderLeft: `3px solid ${borderColor}`,
+              opacity: item.isPast ? 0.75 : 1,
               display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-              padding: '15px', borderRadius: '8px'
+              gap: '10px',
+              padding: '14px 16px'
             }}>
-              <div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ 
-                    fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', 
-                    backgroundColor: item.isPast ? '#E5E7E9' : (isUrgent ? '#FDEDEC' : (isToday ? '#EBF5FB' : 'var(--color-mist)')),
-                    color: item.isPast ? '#7F8C8D' : (isUrgent ? '#E74C3C' : (isToday ? '#2874A6' : 'var(--color-graphite)')),
-                    padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold'
-                  }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <span className={typeTagClass}>
                     {item.isPast ? `✓ ${item.type}` : item.type}
                   </span>
-                  {isUrgent && <span style={{ fontSize: '10px', color: '#E74C3C', fontWeight: 'bold' }}>ATRASADO</span>}
-                  {isToday && <span style={{ fontSize: '10px', color: '#2874A6', fontWeight: 'bold' }}>TAREA PENDIENTE</span>}
-                  {item.isPast && <span style={{ fontSize: '10px', color: '#7F8C8D', fontWeight: 'bold' }}>REGISTRO</span>}
+                  {isUrgent && <span className="tag tag--alert">Atrasado</span>}
+                  {isToday && <span className="tag tag--fern">Hoy</span>}
+                  {item.isPast && <span className="tag tag--muted">Registro</span>}
                 </div>
-                
-                <h3 className="suisse" style={{ fontSize: '16px', margin: '0 0 6px 0', color: item.isPast ? '#5D6D7E' : 'var(--color-ink-black)', textDecoration: item.isPast ? 'line-through' : 'none' }}>
+
+                <h3 className="suisse" style={{ fontSize: '15px', margin: '0 0 6px 0', color: item.isPast ? 'var(--color-slate-smoke)' : 'var(--color-forest-ink)', textDecoration: item.isPast ? 'line-through' : 'none' }}>
                   {(() => {
                     const actionName = item.product_name ? item.product_name : item.type;
                     if (item.plant_name && item.plant_name !== 'General') {
@@ -271,64 +269,58 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                     }
                   })()}
                 </h3>
-                
+
                 {cleanText && (
-                  <p className="body-text" style={{ fontSize: '13px', marginBottom: '8px', lineHeight: '1.4', color: item.isPast ? '#7F8C8D' : 'inherit' }}>{cleanText}</p>
+                  <p className="body-text" style={{ fontSize: '12px', marginBottom: '8px', lineHeight: '1.45' }}>{cleanText}</p>
                 )}
-                
+
                 {tags.length > 0 && (
-                  <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' }}>
                     {tags.map((tag, i) => (
-                      <span key={i} style={{ 
-                        fontSize: '9px', fontWeight: 'bold', 
-                        backgroundColor: tag.bg, color: tag.color, 
-                        padding: '2px 6px', borderRadius: '4px' 
-                      }}>
-                        {tag.text}
-                      </span>
+                      <span key={i} className={tag.className}>{tag.text}</span>
                     ))}
                   </div>
                 )}
-                
+
                 {!item.isPast && item.product_name && (
-                  <div style={{ fontSize: '12px', color: 'var(--color-graphite)' }}>
-                    <strong>Usar:</strong> {item.product_name}
+                  <div style={{ fontSize: '12px', color: 'var(--color-slate-smoke)' }}>
+                    <strong style={{ color: 'var(--color-forest-ink)', fontWeight: 500 }}>Usar:</strong> {item.product_name}
                   </div>
                 )}
               </div>
-              
-              <div style={{ textAlign: 'right', minWidth: '85px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px', height: '100%' }}>
+
+              <div style={{ textAlign: 'right', flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                 <div>
-                  <span style={{ fontSize: '10px', color: 'var(--color-graphite)', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>{item.isPast ? 'Registro' : 'Fecha'}</span>
-                  <span style={{ fontSize: '14px', color: item.isPast ? '#7F8C8D' : (isUrgent ? '#E74C3C' : (isToday ? '#2874A6' : 'var(--color-ink-black)')), fontWeight: 'bold' }}>{formatEuropeanDate(item.date)}</span>
+                  <span className="field-label" style={{ display: 'block', fontSize: '9px', marginBottom: '2px' }}>{item.isPast ? 'Registro' : 'Fecha'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: item.isPast ? 'var(--color-slate-smoke)' : (isUrgent ? 'var(--color-alert)' : 'var(--color-forest-ink)'), fontWeight: 500 }}>{formatEuropeanDate(item.date)}</span>
                 </div>
-                
-                <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+
+                <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
                   {!item.isPast && item.id && (item.isSuggestion || item.urgency === 'alta' || item.urgency === 'media') && (
                     <div style={{ display: 'flex', gap: '5px' }}>
-                      <button 
+                      <button
                         onClick={() => {
                           startTransition(async () => {
                             const { postponeEvent } = await import('@/app/actions');
                             await postponeEvent(item.id);
                           });
                         }}
-                        style={{ fontSize: '9px', color: '#E67E22', backgroundColor: '#FEF5E7', border: '1px solid #F39C12', textDecoration: 'none', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
+                        className="chip-btn"
                         disabled={isPending}
                       >
-                        +1 POSPONER
+                        +1 Posponer
                       </button>
-                      <button 
+                      <button
                         onClick={() => {
                           startTransition(async () => {
                             const { completeEvent } = await import('@/app/actions');
                             await completeEvent(item.id);
                           });
                         }}
-                        style={{ fontSize: '9px', color: '#27AE60', backgroundColor: '#EAFAF1', border: '1px solid #2ECC71', textDecoration: 'none', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
+                        className="chip-btn chip-btn--primary"
                         disabled={isPending}
                       >
-                        ✓ HECHO
+                        ✓ Hecho
                       </button>
                     </div>
                   )}
@@ -341,15 +333,15 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                           await terminarTratamiento(item.id);
                         });
                       }}
-                      style={{ fontSize: '9px', color: '#7F8C8D', backgroundColor: '#F2F3F4', border: '1px solid #BDC3C7', fontWeight: 'bold', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', opacity: isPending ? 0.5 : 1 }}
+                      className="chip-btn"
                       disabled={isPending}
                     >
-                      TERMINAR TRATAMIENTO
+                      Terminar tratamiento
                     </button>
                   )}
                   {item.id && (
-                    <a href={`/calendar/${item.id}/edit`} style={{ fontSize: '10px', color: '#3498DB', textDecoration: 'none', fontWeight: 'bold', padding: '4px 8px', border: '1px solid #3498DB', borderRadius: '4px', textAlign: 'center' }}>
-                      EDITAR
+                    <a href={`/calendar/${item.id}/edit`} style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-deep-fern)', textDecoration: 'none' }}>
+                      [ Editar ]
                     </a>
                   )}
                 </div>
@@ -363,35 +355,28 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', backgroundColor: 'var(--color-mist)', borderRadius: '20px', padding: '4px' }}>
-          <button 
-            onClick={() => setView('list')}
-            style={{ 
-              padding: '6px 15px', borderRadius: '16px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', border: 'none',
-              backgroundColor: view === 'list' ? 'white' : 'transparent',
-              color: view === 'list' ? 'var(--color-ink-black)' : 'var(--color-graphite)',
-              boxShadow: view === 'list' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-              cursor: 'pointer', transition: 'all 0.2s ease'
-            }}
-          >
-            Lista
-          </button>
-          <button 
-            onClick={() => setView('grid')}
-            style={{ 
-              padding: '6px 15px', borderRadius: '16px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', border: 'none',
-              backgroundColor: view === 'grid' ? 'white' : 'transparent',
-              color: view === 'grid' ? 'var(--color-ink-black)' : 'var(--color-graphite)',
-              boxShadow: view === 'grid' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-              cursor: 'pointer', transition: 'all 0.2s ease'
-            }}
-          >
-            Mes
-          </button>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', backgroundColor: 'var(--color-ash-gray)', borderRadius: '10px', padding: '3px', border: '1px solid var(--color-lichen)' }}>
+          {(['list', 'grid'] as const).map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                padding: '5px 14px', borderRadius: '8px',
+                fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 500,
+                letterSpacing: '0.1em', textTransform: 'uppercase', border: 'none',
+                backgroundColor: view === v ? 'white' : 'transparent',
+                color: view === v ? 'var(--color-forest-ink)' : 'var(--color-slate-smoke)',
+                boxShadow: view === v ? 'var(--shadow-subtle)' : 'none',
+                cursor: 'pointer', transition: 'all 0.2s ease'
+              }}
+            >
+              {v === 'list' ? 'Lista' : 'Mes'}
+            </button>
+          ))}
         </div>
       </div>
-      
+
       <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
         {view === 'list' ? renderList() : renderGrid()}
       </div>

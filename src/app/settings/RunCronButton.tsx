@@ -30,20 +30,20 @@ export default function RunCronButton() {
   };
 
   return (
-    <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px' }}>
-      <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#166534' }}>Simulador de Tareas Diarias</h4>
-      <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: '#15803d' }}>
+    <div className="card" style={{ marginTop: '24px' }}>
+      <p className="eyebrow" style={{ marginBottom: '8px' }}>Simulador de tareas diarias</p>
+      <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: 'var(--color-slate-smoke)' }}>
         Dado que estás ejecutando esto en tu ordenador, el servidor no puede enviar mensajes automáticamente por la noche. Usa este botón para simular el paso de un día y forzar el envío de WhatsApps a los contactos con tareas pendientes HOY.
       </p>
-      <button 
-        onClick={runCron} 
+      <button
+        onClick={runCron}
         disabled={isLoading}
-        className="btn-solid" 
-        style={{ backgroundColor: '#16a34a', color: 'white', padding: '8px 15px', fontSize: '12px' }}
+        className="btn-outline"
+        style={{ padding: '8px 15px', fontSize: '12px' }}
       >
-        {isLoading ? 'ENVIANDO...' : 'FORZAR ENVÍO DIARIO DE AVISOS'}
+        {isLoading ? 'Enviando…' : 'Forzar envío diario de avisos'}
       </button>
-      {result && <p style={{ marginTop: '10px', fontSize: '12px', fontWeight: 'bold', color: result.includes('❌') ? '#dc2626' : '#16a34a' }}>{result}</p>}
+      {result && <p style={{ marginTop: '10px', fontSize: '12px', fontWeight: 500, color: result.includes('❌') ? 'var(--color-alert)' : 'var(--color-deep-fern)' }}>{result}</p>}
     </div>
   );
 }

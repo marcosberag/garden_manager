@@ -44,7 +44,7 @@ export default async function SettingsPage() {
                   <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                     <TestWhatsAppButton phone={contact.phone_number} apikey={contact.api_key} />
                     <form action={deleteContact.bind(null, contact.id)}>
-                      <button className="btn-ghost" style={{ padding: '8px 15px', fontSize: '12px', borderColor: 'red', color: 'red' }}>
+                      <button className="chip-btn chip-btn--danger">
                         Eliminar
                       </button>
                     </form>
@@ -63,18 +63,18 @@ export default async function SettingsPage() {
               <h3 className="suisse" style={{ fontSize: '24px', marginBottom: '23px' }}>Nuevo Contacto (CallMeBot)</h3>
               <form action={addContact} style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1', minWidth: '200px' }}>
-                  <label htmlFor="name" style={{ display: 'block', fontSize: '12px', color: 'var(--color-graphite)', textTransform: 'uppercase', marginBottom: '8px' }}>Nombre</label>
-                  <input id="name" name="name" type="text" placeholder="Ej: Mamá" required style={{ width: '100%', padding: '11px 15px', borderRadius: '15px', border: '1px solid var(--color-mist)', outline: 'none' }} />
+                  <label htmlFor="name" className="field-label" style={{ display: 'block', marginBottom: '8px' }}>Nombre</label>
+                  <input id="name" name="name" type="text" placeholder="Ej: Mamá" required className="input-field" />
                 </div>
                 <div style={{ flex: '1', minWidth: '200px' }}>
-                  <label htmlFor="phone" style={{ display: 'block', fontSize: '12px', color: 'var(--color-graphite)', textTransform: 'uppercase', marginBottom: '8px' }}>Teléfono (con país, ej: +34...)</label>
-                  <input id="phone" name="phone" type="text" placeholder="Ej: +34600123456" required style={{ width: '100%', padding: '11px 15px', borderRadius: '15px', border: '1px solid var(--color-mist)', outline: 'none' }} />
+                  <label htmlFor="phone" className="field-label" style={{ display: 'block', marginBottom: '8px' }}>Teléfono (con país, ej: +34...)</label>
+                  <input id="phone" name="phone" type="text" placeholder="Ej: +34600123456" required className="input-field" />
                 </div>
                 <div style={{ flex: '1', minWidth: '200px' }}>
-                  <label htmlFor="apikey" style={{ display: 'block', fontSize: '12px', color: 'var(--color-graphite)', textTransform: 'uppercase', marginBottom: '8px' }}>API Key CallMeBot</label>
-                  <input id="apikey" name="apikey" type="text" placeholder="Tu API Key" required style={{ width: '100%', padding: '11px 15px', borderRadius: '15px', border: '1px solid var(--color-mist)', outline: 'none' }} />
+                  <label htmlFor="apikey" className="field-label" style={{ display: 'block', marginBottom: '8px' }}>API Key CallMeBot</label>
+                  <input id="apikey" name="apikey" type="text" placeholder="Tu API Key" required className="input-field" />
                 </div>
-                <button type="submit" className="btn-filled">GUARDAR</button>
+                <button type="submit" className="btn-filled">Guardar</button>
               </form>
             </div>
             
