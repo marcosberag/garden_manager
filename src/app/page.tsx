@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import SmartCalendar from '@/app/calendar/SmartCalendar';
 import ChatWidget from '@/components/ChatWidget';
 import ClearEventsButton from './ClearEventsButton';
+import RecalcularPautasButton from './RecalcularPautasButton';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -58,6 +59,7 @@ export default async function HomePage() {
               <div style={{ padding: '15px 20px', backgroundColor: 'var(--color-ink-black)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px' }}>Agenda y Registro</h3>
                 <div style={{ display: 'flex', gap: '10px' }}>
+                  <RecalcularPautasButton />
                   <ClearEventsButton />
                   <Link href="/calendar/new" style={{ color: 'var(--color-ink-black)', backgroundColor: 'white', textDecoration: 'none', fontSize: '11px', fontWeight: 'bold', padding: '5px 10px', borderRadius: '4px', display: 'flex', alignItems: 'center' }}>+ AÑADIR</Link>
                 </div>

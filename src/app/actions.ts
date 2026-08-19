@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { deducirFrecuencia, leerFrecuencia, etiquetaDeMetodo } from '@/lib/frecuencias';
+import { deducirFrecuencia, leerFrecuencia, etiquetaDeMetodo, frecuenciaSegunCaso } from '@/lib/frecuencias';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
 
 export async function addPlant(formData: FormData) {
@@ -715,4 +715,132 @@ export async function addProductFromScan(identificado: {
 
   revalidatePath('/products');
   return { product: data };
+}
+
+/**
+ * Repasa todas las tareas programadas y les recalcula la pauta con la IA según
+ * su caso (producto + planta + modo si consta en las notas). Cuando la pauta
+ * cambia, borra los avisos [PROGRAMADO] de esa tarea y los reprograma desde la
+ * última aplicación real; si nunca la hubo, conserva la próxima cita y solo
+ * reespacia las siguientes. Las tareas sin producto no se tocan: sin producto
+ * no hay pauta que calcular.
+ */
+export async function recalcularPautasProgramadas(): Promise<{
+  cambios?: { tarea: string; antes: number; ahora: number; motivo: string }[];
+  yaCorrectas?: number;
+  sinProducto?: number;
+  error?: string;
+}> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const { data: events, error } = await supabase
+    .from('events')
+    .select('id, type, date, notes, frequency_days, plant_id, product_id, products(name, type, description), plants(name, species)')
+    .order('date', { ascending: true });
+
+  if (error || !events) {
+    console.error('Error leyendo los eventos para recalcular pautas:', error);
+    return { error: 'No se pudieron leer los eventos' };
+  }
+
+  const programados = events.filter(e => e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'));
+
+  // Una "tarea" es la combinación tipo + planta + producto, la misma que usa
+  // addEvent para reemplazar los avisos programados.
+  const grupos = new Map<string, any[]>();
+  for (const e of programados) {
+    const clave = `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
+    grupos.set(clave, [...(grupos.get(clave) || []), e]);
+  }
+
+  const getLocalDateString = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const cambios: { tarea: string; antes: number; ahora: number; motivo: string }[] = [];
+  let yaCorrectas = 0;
+  let sinProducto = 0;
+
+  for (const grupo of grupos.values()) {
+    const muestra: any = grupo[0];
+    const producto: any = muestra.products;
+    const planta: any = muestra.plants;
+
+    if (!producto?.name) {
+      sinProducto += 1;
+      continue;
+    }
+
+    // Los eventos nuevos llevan el modo en las notas; si consta, se aprovecha.
+    const metodo = muestra.notes?.match(/\(aplicación ([^)]+)\)/)?.[1] || null;
+
+    const pauta = await frecuenciaSegunCaso({
+      producto: { nombre: producto.name, tipo: producto.type, descripcion: producto.description },
+      planta: planta ? { nombre: planta.name, especie: planta.species } : null,
+      metodo,
+    });
+    if (!pauta) continue;
+
+    const antes = leerFrecuencia(muestra);
+    const ahora = pauta.frequency_days;
+    const tarea = `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`;
+
+    if (ahora === antes) {
+      yaCorrectas += 1;
+      continue;
+    }
+
+    // Ancla: la última aplicación real de esta misma tarea.
+    const reales = events.filter(e =>
+      e.type === muestra.type &&
+      (e.plant_id || null) === (muestra.plant_id || null) &&
+      (e.product_id || null) === (muestra.product_id || null) &&
+      !e.notes?.includes('[PROGRAMADO]')
+    );
+    const ultimaReal = reales.length ? reales[reales.length - 1].date : null;
+
+    let siguiente: Date;
+    if (ultimaReal) {
+      siguiente = new Date(ultimaReal);
+      siguiente.setDate(siguiente.getDate() + ahora);
+    } else {
+      siguiente = new Date(muestra.date);
+    }
+    if (siguiente < hoy) siguiente = new Date(hoy);
+
+    const { error: errorBorrado } = await supabase.from('events').delete().in('id', grupo.map((g: any) => g.id));
+    if (errorBorrado) {
+      console.error(`Error borrando los avisos antiguos de "${tarea}":`, errorBorrado);
+      continue;
+    }
+
+    const nuevos = [];
+    for (let i = 0; i < 3; i++) {
+      nuevos.push({
+        user_id: user.id,
+        type: muestra.type,
+        date: getLocalDateString(siguiente),
+        notes: `[PROGRAMADO] Tarea programada cada ${ahora} días${metodo ? ` (aplicación ${metodo})` : ''}.`,
+        frequency_days: ahora,
+        plant_id: muestra.plant_id || null,
+        product_id: muestra.product_id || null,
+      });
+      siguiente.setDate(siguiente.getDate() + ahora);
+    }
+
+    const { error: errorInsercion } = await supabase.from('events').insert(nuevos);
+    if (errorInsercion) {
+      console.error(`Error reprogramando "${tarea}":`, errorInsercion);
+      continue;
+    }
+
+    cambios.push({ tarea, antes, ahora, motivo: pauta.motivo });
+  }
+
+  revalidatePath('/');
+  revalidatePath('/calendar');
+  return { cambios, yaCorrectas, sinProducto };
 }

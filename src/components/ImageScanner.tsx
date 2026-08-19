@@ -3,7 +3,10 @@
 import React, { useRef, useState } from 'react';
 
 export default function ImageScanner({ onIdentified }: { onIdentified: (species: string) => void }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Dos inputs porque `capture` fuerza la cámara en el móvil: uno la dispara
+  // y el otro abre la galería. En escritorio ambos abren el selector normal.
+  const camaraRef = useRef<HTMLInputElement>(null);
+  const galeriaRef = useRef<HTMLInputElement>(null);
   const [isScanning, setIsScanning] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,46 +36,54 @@ export default function ImageScanner({ onIdentified }: { onIdentified: (species:
       alert("Error al conectar con la IA visual.");
     } finally {
       setIsScanning(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (camaraRef.current) camaraRef.current.value = '';
+      if (galeriaRef.current) galeriaRef.current.value = '';
     }
+  };
+
+  const estiloBoton: React.CSSProperties = {
+    flex: 1,
+    padding: '15px',
+    backgroundColor: isScanning ? 'var(--color-mist)' : 'var(--color-eucalyptus)',
+    color: isScanning ? 'var(--color-graphite)' : '#fff',
+    border: 'none',
+    cursor: isScanning ? 'not-allowed' : 'pointer',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '10px',
   };
 
   return (
     <div style={{ marginBottom: '20px' }}>
-      <input 
-        type="file" 
-        accept="image/*" 
+      <input
+        type="file"
+        accept="image/*"
         capture="environment"
-        ref={fileInputRef}
+        ref={camaraRef}
         onChange={handleFileChange}
-        style={{ display: 'none' }} 
+        style={{ display: 'none' }}
       />
-      
-      <button 
-        type="button" 
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isScanning}
-        style={{
-          width: '100%',
-          padding: '15px',
-          backgroundColor: isScanning ? 'var(--color-mist)' : 'var(--color-eucalyptus)',
-          color: isScanning ? 'var(--color-graphite)' : '#fff',
-          border: 'none',
-          cursor: isScanning ? 'not-allowed' : 'pointer',
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: '10px'
-        }}
-      >
-        {isScanning ? 'Analizando imagen...' : '📸 IDENTIFICAR CON CÁMARA IA'}
-      </button>
+      <input
+        type="file"
+        accept="image/*"
+        ref={galeriaRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button type="button" onClick={() => camaraRef.current?.click()} disabled={isScanning} style={estiloBoton}>
+          {isScanning ? 'Analizando imagen...' : '📸 IDENTIFICAR CON CÁMARA'}
+        </button>
+        <button type="button" onClick={() => galeriaRef.current?.click()} disabled={isScanning} style={estiloBoton}>
+          {isScanning ? '...' : '🖼️ DESDE LA GALERÍA'}
+        </button>
+      </div>
     </div>
   );
 }
