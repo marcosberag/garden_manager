@@ -10,6 +10,7 @@ type Sugerencia = {
   min_days: number | null;
   max_days: number | null;
   motivo: string;
+  hasta: string | null;
 };
 
 const normaliza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
@@ -249,6 +250,11 @@ export default function NewEventForm({ plants, products, today }: { plants: any[
               Cada {sugerencia.frequency_days} días
               {sugerencia.min_days && sugerencia.max_days ? ` — lo habitual es entre ${sugerencia.min_days} y ${sugerencia.max_days}` : ''}. {sugerencia.motivo}
             </p>
+            {sugerencia.hasta && (
+              <p style={{ fontSize: '13px', color: 'var(--color-graphite)', margin: '4px 0 0 0', lineHeight: '1.45' }}>
+                Hasta cuándo: {sugerencia.hasta}.
+              </p>
+            )}
           </div>
         )}
         {!calculando && !sugerencia && productoElegido?.frequency_days && (

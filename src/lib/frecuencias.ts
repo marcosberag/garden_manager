@@ -109,6 +109,8 @@ export type FrecuenciaDelCaso = {
   min_days: number | null;
   max_days: number | null;
   motivo: string;
+  /** Hasta cuándo mantener las aplicaciones: época o condición de parada. */
+  hasta: string | null;
 };
 
 // Valores del selector de modo de aplicación del formulario de tratamiento.
@@ -147,6 +149,7 @@ export async function frecuenciaSegunCaso(caso: CasoTratamiento): Promise<Frecue
         min_days: z.number().describe('Límite inferior del rango habitual de la pauta, en días. 0 si no hay rango.'),
         max_days: z.number().describe('Límite superior del rango habitual de la pauta, en días. 0 si no hay rango.'),
         motivo: z.string().describe('Una o dos frases en español justificando la pauta para este caso: modo de aplicación, especie y severidad si se conocen. Sin repetir el nombre del producto.'),
+        hasta: z.string().describe('Hasta cuándo mantener las aplicaciones, en pocas palabras: una condición de parada o época del año. Ej: "mientras haya síntomas", "hasta finales de octubre", "solo con humedad alta". Cadena vacía si de verdad no hay límite.'),
       }),
       prompt: `Eres un ingeniero agrónomo. Un usuario va a registrar este tratamiento en su jardín doméstico:
 ${lineas.join('\n')}
@@ -155,7 +158,9 @@ Indica cada cuántos días conviene repetirlo EN ESTE CASO CONCRETO, no la pauta
 - El modo de aplicación importa: una aplicación foliar no sigue la misma pauta que la misma materia activa al riego o al suelo.
 - La especie importa: usa la pauta adecuada para esa planta si la conoces.
 - Si las notas indican severidad ("hay bastante", "muy avanzado"...), acorta hacia el mínimo del rango habitual; si es un uso preventivo, alarga hacia el máximo.
-Devuelve también el rango habitual (mínimo y máximo en días) para que el usuario pueda ajustar con criterio.`,
+Devuelve también el rango habitual (mínimo y máximo en días) para que el usuario pueda ajustar con criterio,
+y hasta cuándo mantener las aplicaciones: los tratamientos no son para siempre. Indica la condición de parada
+o la época del año en que dejan de tener sentido (fin de la temporada del hongo, desaparición de síntomas...).`,
       temperature: 0.2,
     });
 
@@ -172,6 +177,7 @@ Devuelve también el rango habitual (mínimo y máximo en días) para que el usu
       min_days: rangoValido ? min : null,
       max_days: rangoValido ? max : null,
       motivo: object.motivo,
+      hasta: object.hasta?.trim() || null,
     };
   } catch (error) {
     console.error('[frecuencias] Fallo calculando la pauta del caso, se mantiene la del producto:', error);

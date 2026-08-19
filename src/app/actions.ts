@@ -728,16 +728,18 @@ export async function addProductFromScan(identificado: {
  * Eventos de la misma tarea: la combinación tipo + planta + producto, la misma
  * que usa addEvent para reemplazar avisos programados.
  */
+function claveDeTarea(e: any): string {
+  return `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
+}
+
 function esMismaTarea(a: any, b: any): boolean {
-  return a.type === b.type &&
-    (a.plant_id || null) === (b.plant_id || null) &&
-    (a.product_id || null) === (b.product_id || null);
+  return claveDeTarea(a) === claveDeTarea(b);
 }
 
 function agrupaPorTarea(programados: any[]): any[][] {
   const grupos = new Map<string, any[]>();
   for (const e of programados) {
-    const clave = `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
+    const clave = claveDeTarea(e);
     grupos.set(clave, [...(grupos.get(clave) || []), e]);
   }
   return [...grupos.values()];
@@ -749,24 +751,24 @@ function metodoDeLasNotas(notes?: string | null): string | null {
 }
 
 /**
- * Sustituye los avisos [PROGRAMADO] de una tarea por 3 nuevos con la pauta
- * indicada, anclados en la última aplicación real; si nunca la hubo, conserva
- * la próxima cita y solo reespacia las siguientes.
+ * Deja una tarea con 3 avisos [PROGRAMADO] a la pauta indicada, borrando antes
+ * los que hubiera. El primer aviso se ancla en la última aplicación real; si
+ * nunca la hubo, conserva la próxima cita y solo reespacia las siguientes.
  */
-async function reprogramarGrupo(
+async function reprogramarTarea(
   supabase: any,
   userId: string,
-  grupo: any[],
+  tarea: any,
+  idsABorrar: string[],
   todos: any[],
   dias: number,
   metodo: string | null,
 ): Promise<boolean> {
-  const muestra = grupo[0];
   const fechaLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
-  const reales = todos.filter(e => esMismaTarea(e, muestra) && !e.notes?.includes('[PROGRAMADO]'));
+  const reales = todos.filter(e => esMismaTarea(e, tarea) && !e.notes?.includes('[PROGRAMADO]'));
   const ultimaReal = reales.length ? reales[reales.length - 1].date : null;
 
   let siguiente: Date;
@@ -774,26 +776,28 @@ async function reprogramarGrupo(
     siguiente = new Date(ultimaReal);
     siguiente.setDate(siguiente.getDate() + dias);
   } else {
-    siguiente = new Date(muestra.date);
+    siguiente = new Date(tarea.date);
   }
   if (siguiente < hoy) siguiente = new Date(hoy);
 
-  const { error: errorBorrado } = await supabase.from('events').delete().in('id', grupo.map((g: any) => g.id));
-  if (errorBorrado) {
-    console.error('Error borrando los avisos antiguos:', errorBorrado);
-    return false;
+  if (idsABorrar.length > 0) {
+    const { error: errorBorrado } = await supabase.from('events').delete().in('id', idsABorrar);
+    if (errorBorrado) {
+      console.error('Error borrando los avisos antiguos:', errorBorrado);
+      return false;
+    }
   }
 
   const nuevos = [];
   for (let i = 0; i < 3; i++) {
     nuevos.push({
       user_id: userId,
-      type: muestra.type,
+      type: tarea.type,
       date: fechaLocal(siguiente),
       notes: `[PROGRAMADO] Tarea programada cada ${dias} días${metodo ? ` (aplicación ${metodo})` : ''}.`,
       frequency_days: dias,
-      plant_id: muestra.plant_id || null,
-      product_id: muestra.product_id || null,
+      plant_id: tarea.plant_id || null,
+      product_id: tarea.product_id || null,
     });
     siguiente.setDate(siguiente.getDate() + dias);
   }
@@ -822,19 +826,22 @@ async function propagarFrecuenciaDeProducto(supabase: any, userId: string, produ
 
   for (const grupo of agrupaPorTarea(programados)) {
     if (leerFrecuencia(grupo[0]) === dias) continue;
-    await reprogramarGrupo(supabase, userId, grupo, events, dias, metodoDeLasNotas(grupo[0].notes));
+    await reprogramarTarea(supabase, userId, grupo[0], grupo.map((g: any) => g.id), events, dias, metodoDeLasNotas(grupo[0].notes));
   }
 }
 
 /**
  * Repasa las tareas programadas (todas, o solo las de un producto) y les
  * recalcula la pauta con la IA según su caso: producto + planta + modo si
- * consta en las notas. Cuando la pauta cambia, reprograma sus avisos. Las
- * tareas sin producto no se tocan: sin producto no hay pauta que calcular.
+ * consta en las notas. Además reactiva las tareas apagadas: las que tienen
+ * producto con pauta y aplicaciones reales pero se quedaron sin avisos
+ * pendientes (por completarse sin frecuencia o por una limpieza), que hasta
+ * ahora desaparecían del radar sin que nadie volviera a avisar.
  */
 export async function recalcularPautasProgramadas(productId?: string): Promise<{
-  cambios?: { tarea: string; antes: number; ahora: number; motivo: string }[];
-  yaCorrectas?: number;
+  cambios?: { tarea: string; antes: number; ahora: number; motivo: string; hasta: string | null }[];
+  reactivadas?: { tarea: string; dias: number; ultima: string; motivo: string; hasta: string | null }[];
+  yaCorrectas?: string[];
   sinProducto?: number;
   error?: string;
 }> {
@@ -845,7 +852,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
 
   const { data: events, error } = await supabase
     .from('events')
-    .select('id, type, date, notes, frequency_days, plant_id, product_id, products(name, type, description), plants(name, species)')
+    .select('id, type, date, notes, frequency_days, plant_id, product_id, products(name, type, description, frequency_days), plants(name, species)')
     .order('date', { ascending: true });
 
   if (error || !events) {
@@ -857,8 +864,9 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
     e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]') &&
     (!productId || e.product_id === productId));
 
-  const cambios: { tarea: string; antes: number; ahora: number; motivo: string }[] = [];
-  let yaCorrectas = 0;
+  const cambios: { tarea: string; antes: number; ahora: number; motivo: string; hasta: string | null }[] = [];
+  const reactivadas: { tarea: string; dias: number; ultima: string; motivo: string; hasta: string | null }[] = [];
+  const yaCorrectas: string[] = [];
   let sinProducto = 0;
 
   for (const grupo of agrupaPorTarea(programados)) {
@@ -871,6 +879,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
       continue;
     }
 
+    const tarea = `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`;
     const metodo = metodoDeLasNotas(muestra.notes);
     const pauta = await frecuenciaSegunCaso({
       producto: { nombre: producto.name, tipo: producto.type, descripcion: producto.description },
@@ -882,21 +891,53 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
     const antes = leerFrecuencia(muestra);
     const ahora = pauta.frequency_days;
     if (ahora === antes) {
-      yaCorrectas += 1;
+      yaCorrectas.push(`${tarea} (cada ${antes} días)`);
       continue;
     }
 
-    if (await reprogramarGrupo(supabase, user.id, grupo, events, ahora, metodo)) {
-      cambios.push({
+    if (await reprogramarTarea(supabase, user.id, muestra, grupo.map((g: any) => g.id), events, ahora, metodo)) {
+      cambios.push({ tarea, antes, ahora, motivo: pauta.motivo, hasta: pauta.hasta });
+    }
+  }
+
+  // Tareas apagadas: la última aplicación real de cada tarea con producto,
+  // para resucitar las que no tengan ya ningún aviso pendiente.
+  const clavesPendientes = new Set(programados.map(claveDeTarea));
+  const ultimaRealPorTarea = new Map<string, any>();
+  for (const e of events) {
+    if (e.notes?.includes('[PROGRAMADO]')) continue;
+    if (!e.product_id) continue;
+    if (productId && e.product_id !== productId) continue;
+    ultimaRealPorTarea.set(claveDeTarea(e), e); // ordenados por fecha: queda la última
+  }
+
+  for (const [clave, ultimo] of ultimaRealPorTarea) {
+    if (clavesPendientes.has(clave)) continue;
+    const producto: any = ultimo.products;
+    const planta: any = ultimo.plants;
+    // Sin pauta en el producto la tarea se considera puntual y no se resucita.
+    if (!producto?.name || !producto.frequency_days) continue;
+
+    const metodo = metodoDeLasNotas(ultimo.notes);
+    const pauta = await frecuenciaSegunCaso({
+      producto: { nombre: producto.name, tipo: producto.type, descripcion: producto.description },
+      planta: planta ? { nombre: planta.name, especie: planta.species } : null,
+      metodo,
+    });
+    const dias = pauta?.frequency_days ?? producto.frequency_days;
+
+    if (await reprogramarTarea(supabase, user.id, ultimo, [], events, dias, metodo)) {
+      reactivadas.push({
         tarea: `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`,
-        antes,
-        ahora,
-        motivo: pauta.motivo,
+        dias,
+        ultima: ultimo.date,
+        motivo: pauta?.motivo || 'Se retoma con la pauta guardada del producto.',
+        hasta: pauta?.hasta ?? null,
       });
     }
   }
 
   revalidatePath('/');
   revalidatePath('/calendar');
-  return { cambios, yaCorrectas, sinProducto };
+  return { cambios, reactivadas, yaCorrectas, sinProducto };
 }
