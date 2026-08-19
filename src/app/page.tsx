@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 import SmartCalendar from '@/app/calendar/SmartCalendar';
 import ChatWidget from '@/components/ChatWidget';
 import RecalcularPautasButton from './RecalcularPautasButton';
+import { resolverCategoria } from '@/lib/plant-icons-ai';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -26,6 +27,18 @@ export default async function HomePage() {
     .from('plants')
     .select('*')
     .eq('user_id', user.id);
+
+  // Relleno perezoso: las plantas de antes del sistema de iconos no tienen
+  // categoría y salían todas con el brote genérico en el mapa. Se resuelve
+  // aquí una única vez (reglas de texto gratis; IA solo para lo que no encaje)
+  // y queda guardado para siempre.
+  const sinCategoria = (plants || []).filter(p => !p.icon_category).slice(0, 30);
+  if (sinCategoria.length > 0) {
+    await Promise.all(sinCategoria.map(async p => {
+      p.icon_category = await resolverCategoria(p.species, p.name);
+      await supabase.from('plants').update({ icon_category: p.icon_category }).match({ id: p.id, user_id: user.id });
+    }));
+  }
 
   const { data: parcel } = await supabase
     .from('parcels')

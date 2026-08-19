@@ -54,11 +54,20 @@ function ColocadorPorToque({ colocando, onMover }: { colocando: string | null; o
 }
 
 export default function MapaRevision({ parcel, marcadores, colocando, onMover }: Props) {
-  const estiloParcela = useMemo(() => ({
-    fillColor: '#77aa83',
-    fillOpacity: 0.18,
+  // Línea de finca sobre el satélite: trazo blanco con sombra oscura debajo,
+  // igual que en el mapa principal.
+  const estiloParcelaBajo = useMemo(() => ({
+    fill: false,
     color: '#09352e',
-    weight: 2,
+    weight: 5,
+    opacity: 0.45,
+  }), []);
+  const estiloParcela = useMemo(() => ({
+    fillColor: '#85c093',
+    fillOpacity: 0.05,
+    color: '#ffffff',
+    weight: 2.5,
+    opacity: 0.95,
   }), []);
 
   return (
@@ -69,16 +78,19 @@ export default function MapaRevision({ parcel, marcadores, colocando, onMover }:
         maxZoom={21}
         style={{ height: '100%', width: '100%', backgroundColor: '#ffffff' }}
       >
-        {/* Sin parcela dibujada, el satélite ayuda a orientarse */}
-        {!parcel && (
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution="Tiles &copy; Esri"
-            maxZoom={21}
-            maxNativeZoom={19}
-          />
+        {/* Imagen real de satélite siempre debajo, con la parcela como contorno */}
+        <TileLayer
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          attribution="Tiles &copy; Esri"
+          maxZoom={21}
+          maxNativeZoom={19}
+        />
+        {parcel && (
+          <>
+            <GeoJSON data={parcel as GeoJSON.GeoJsonObject} style={estiloParcelaBajo} />
+            <GeoJSON data={parcel as GeoJSON.GeoJsonObject} style={estiloParcela} />
+          </>
         )}
-        {parcel && <GeoJSON data={parcel as GeoJSON.GeoJsonObject} style={estiloParcela} />}
 
         <AjusteInicial parcel={parcel} marcadores={marcadores} />
         <ColocadorPorToque colocando={colocando} onMover={onMover} />

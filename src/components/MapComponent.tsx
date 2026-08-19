@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, GeoJSON, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { pinDePlanta, TAMANO_PIN, ANCLA_PIN } from '@/lib/plant-icons';
+import { pinDePlanta, svgDePlanta, TAMANO_PIN, ANCLA_PIN } from '@/lib/plant-icons';
 
 // Todas las plantas usan un pin propio (ver más abajo). Se sustituye también el
 // marcador por defecto de Leaflet, que se descargaba de unpkg.com, para no
@@ -83,11 +83,21 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
   }, [parcel, mapReady]);
 
   // Si hay parcela, el estilo del polígono
+  // La parcela va sobre la imagen real de satélite, así que el borde es una
+  // línea de finca al estilo Google Earth: trazo blanco nítido con una sombra
+  // oscura debajo para que se lea sobre cualquier vegetación.
+  const parcelUnderStyle = {
+    fill: false,
+    color: '#09352e',
+    weight: 5,
+    opacity: 0.45,
+  };
   const parcelStyle = {
-    fillColor: '#77aa83', // Salvia apagada: lavado suave, como lámina de herbario
-    fillOpacity: 0.18,
-    color: '#09352e', // Borde en tinta bosque, sólido y nítido
-    weight: 2,
+    fillColor: '#85c093',
+    fillOpacity: 0.05,
+    color: '#ffffff',
+    weight: 2.5,
+    opacity: 0.95,
   };
 
   return (
@@ -118,46 +128,54 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
           height: '100%', 
           width: '100%', 
           cursor: onLocationSelect && !parcel ? 'crosshair' : (selectingMode && parcel ? 'crosshair' : 'grab'),
-          backgroundColor: parcel ? 'var(--color-pure-canvas, #ffffff)' : 'var(--color-sage-paper, #e7eae6)'
+          backgroundColor: 'var(--color-sage-paper, #e7eae6)'
         }}
         ref={mapRef}
         whenReady={() => setMapReady(true)}
         maxZoom={21} // Allow deep zoom for small parcels
       >
-        {!parcel && (
-          <>
-            {/* Satélite (Esri World Imagery) */}
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution='Tiles &copy; Esri'
-              maxZoom={21}
-              maxNativeZoom={19}
-            />
+        {/* Imagen real de satélite (Esri World Imagery) siempre debajo: el
+            jardín de verdad, no un esquema sobre blanco. */}
+        <TileLayer
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+          attribution='Tiles &copy; Esri'
+          maxZoom={21}
+          maxNativeZoom={19}
+        />
 
-            {/* Nombres de Calles y Lugares encima del Satélite */}
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-              attribution=""
-              maxZoom={21}
-              maxNativeZoom={19}
-            />
-          </>
+        {/* Nombres de calles y lugares, solo mientras se busca la parcela */}
+        {!parcel && (
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+            attribution=""
+            maxZoom={21}
+            maxNativeZoom={19}
+          />
         )}
 
         {parcel && (
-          <GeoJSON data={parcel} style={parcelStyle} />
+          <>
+            <GeoJSON data={parcel} style={parcelUnderStyle} />
+            <GeoJSON data={parcel} style={parcelStyle} />
+          </>
         )}
 
         {drawingPath && drawingPath.length > 1 && (
           <Polyline positions={drawingPath} color="var(--color-eucalyptus)" weight={4} dashArray="5, 10" />
         )}
 
-        {parcel && plants.filter(p => (p.lat && p.lng) || (p.path && p.path.length > 0)).map(plant => {
-          
-          // Con foto manda la foto; si no, el pin de la categoría de la planta.
+        {plants.filter(p => (p.lat && p.lng) || (p.path && p.path.length > 0)).map(plant => {
+
+          // Con foto manda la foto, con el icono de su categoría como insignia;
+          // sin foto, el pin lleva el dibujo de la categoría dentro.
           const iconHtml = plant.image_url
-            ? `<div style="width: 42px; height: 42px; border-radius: 50%; border: 3px solid ${VERDE_APP}; box-shadow: 0 3px 6px rgba(0,0,0,0.35); overflow: hidden; background-color: white;">
-                 <img src="${plant.image_url}" style="width: 100%; height: 100%; object-fit: cover;" />
+            ? `<div style="position: relative; width: 42px; height: 42px;">
+                 <div style="width: 42px; height: 42px; border-radius: 50%; border: 3px solid ${VERDE_APP}; box-shadow: 0 3px 6px rgba(0,0,0,0.35); overflow: hidden; background-color: white;">
+                   <img src="${plant.image_url}" style="width: 100%; height: 100%; object-fit: cover;" />
+                 </div>
+                 <div style="position: absolute; right: -5px; bottom: -5px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
+                   ${svgDePlanta(plant.icon_category, 14)}
+                 </div>
                </div>`
             : pinDePlanta(plant.icon_category);
 
@@ -216,7 +234,7 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
                       className="btn-solid"
                       style={{ display: 'block', textAlign: 'center', backgroundColor: 'var(--color-ink-black)', color: 'white', padding: '8px', textDecoration: 'none', fontSize: '12px', width: '100%' }}
                     >
-                      ABRIR FICHA
+                      Abrir ficha
                     </a>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
@@ -227,7 +245,7 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
                         className="btn-outline"
                         style={{ flex: 1, padding: '6px', fontSize: '11px', borderColor: 'var(--color-graphite)', color: 'var(--color-ink-black)' }}
                       >
-                        MOVER
+                        Mover
                       </button>
                       <button 
                         onClick={() => {
@@ -237,7 +255,7 @@ export default function MapComponent({ plants, parcel, onLocationSelect, selecti
                         className="btn-outline"
                         style={{ flex: 1, padding: '6px', fontSize: '11px', borderColor: 'var(--color-alert)', color: 'var(--color-alert)' }}
                       >
-                        QUITAR
+                        Quitar
                       </button>
                     </div>
                   </div>
