@@ -4,8 +4,7 @@ import MapWrapper from '@/components/MapWrapper';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import SmartCalendar from '@/app/calendar/SmartCalendar';
-import ChatWidget from '@/components/ChatWidget';
-import RecalcularPautasButton from './RecalcularPautasButton';
+import Asistente from '@/components/Asistente';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
 import { categoriaDeEspecie } from '@/lib/plant-icons';
 import { fotoDeEspecie } from '@/lib/foto-especie';
@@ -74,15 +73,13 @@ export default async function HomePage() {
         </Link>
       </div>
 
-      {/* Panel de agenda */}
+      {/* Panel lateral: asistente + agenda */}
       {user && (
         <div className="home-panel">
+          <Asistente />
           <div className="home-panel-head">
             <h3 className="home-panel-title">[ Agenda ]</h3>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <RecalcularPautasButton />
-              <Link href="/calendar/new" className="chip-btn chip-btn--primary">+ Añadir</Link>
-            </div>
+            <Link href="/calendar/new" className="chip-btn chip-btn--primary">+ Añadir</Link>
           </div>
           <div className="home-panel-body">
             <Suspense fallback={<p style={{ fontSize: '12px', color: 'var(--color-slate-smoke)', textAlign: 'center' }}>Cargando calendario...</p>}>

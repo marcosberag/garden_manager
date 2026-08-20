@@ -5,8 +5,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { deducirFrecuencia, leerFrecuencia, etiquetaDeMetodo, frecuenciaSegunCaso } from '@/lib/frecuencias';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
+import { categoriaDeEspecie } from '@/lib/plant-icons';
 import { centroDeGeojson } from '@/lib/meteo';
 import { generarPlanAnual, type PropuestaPlan } from '@/lib/plan-anual';
+import { interpretarPeticion, type EnlaceAsistente } from '@/lib/asistente';
 
 export async function addPlant(formData: FormData) {
   const supabase = await createClient();
@@ -1251,4 +1253,143 @@ export async function aplicarPlanAnual(seleccion: PropuestaPlan[]): Promise<{ cr
   revalidatePath('/');
   revalidatePath('/calendar');
   return { creadas };
+}
+
+export type RespuestaAsistente = {
+  respuesta: string;
+  hechos: string[];
+  enlaces: { href: string; etiqueta: string }[];
+  error?: string;
+};
+
+const ENLACES_ASISTENTE: Record<EnlaceAsistente, { href: string; etiqueta: string }> = {
+  inventario: { href: '/products/new', etiqueta: 'Añadir producto (escanea la etiqueta)' },
+  nueva_planta: { href: '/plants/new', etiqueta: 'Añadir planta con foto' },
+  nuevo_tratamiento: { href: '/calendar/new', etiqueta: 'Registrar tratamiento' },
+  recorrido: { href: '/recorrido', etiqueta: 'Iniciar recorrido' },
+  ajustes: { href: '/settings', etiqueta: 'Abrir ajustes' },
+};
+
+/**
+ * El asistente de la home: recibe la petición en lenguaje natural, la
+ * interpreta la IA con el jardín como contexto, y aquí se ejecutan los
+ * registros que decida (eventos, productos, plantas) con los mismos campos
+ * que usan los formularios. Devuelve la contestación, la lista de lo que ha
+ * quedado registrado y los enlaces a pantallas que convenga abrir.
+ */
+export async function consultarAsistente(
+  texto: string,
+  previas: { pregunta: string; respuesta: string }[],
+): Promise<RespuestaAsistente> {
+  const vacio = { respuesta: '', hechos: [], enlaces: [] };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ...vacio, error: 'Usuario no autenticado' };
+
+  const peticion = texto?.trim().slice(0, 600);
+  if (!peticion) return { ...vacio, error: 'Cuéntame algo primero.' };
+
+  const [{ data: plants }, { data: products }, { data: events }] = await Promise.all([
+    supabase.from('plants').select('id, name, species').eq('user_id', user.id),
+    supabase.from('products').select('id, name, type').eq('user_id', user.id),
+    supabase.from('events').select('type, date, notes, plants(name), products(name)').order('date', { ascending: false }).limit(25),
+  ]);
+
+  // Fecha del dueño, no del servidor: el jardín vive en España.
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+
+  type EventoCtx = { type: string; date: string; notes: string | null; plants: { name: string } | null; products: { name: string } | null };
+  const agenda = ((events || []) as unknown as EventoCtx[]).map(e => {
+    const nota = e.notes ? ` — ${e.notes.replace(/\[[A-Z]+\]/g, '').trim().slice(0, 60)}` : '';
+    return `- ${e.date}: ${e.products?.name || e.type}${e.plants?.name ? ` en ${e.plants.name}` : ''}${nota}`;
+  });
+
+  const r = await interpretarPeticion(peticion, {
+    hoy,
+    plantas: (plants || []).map(p => ({ nombre: p.name as string, especie: (p.species as string | null) })),
+    inventario: (products || []).map(p => ({ nombre: p.name as string, tipo: (p.type as string) || 'Otro' })),
+    agenda,
+    previas: (previas || []).slice(-4).map(t => ({ pregunta: String(t.pregunta).slice(0, 300), respuesta: String(t.respuesta).slice(0, 300) })),
+  });
+
+  if (!r) return { ...vacio, error: 'No he podido pensarlo ahora mismo. Inténtalo de nuevo en un momento.' };
+
+  const limpia = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  const fechaCorta = (iso: string) => { const [a, m, d] = iso.split('-'); return `${d}/${m}/${a}`; };
+  const hechos: string[] = [];
+
+  for (const ev of (r.eventos || []).slice(0, 5)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ev.fecha)) continue;
+    const plant_id = ev.planta ? (plants || []).find(x => limpia(x.name) === limpia(ev.planta!))?.id ?? null : null;
+    const product_id = ev.producto ? (products || []).find(x => limpia(x.name) === limpia(ev.producto!))?.id ?? null : null;
+    const nota = ev.nota.replace(/[\[\]]/g, '').trim().slice(0, 380);
+    const esFuturo = ev.fecha > hoy;
+    const { error } = await supabase.from('events').insert({
+      user_id: user.id,
+      type: ev.tipo,
+      date: ev.fecha,
+      notes: esFuturo ? `[PROGRAMADO] ${nota}` : nota,
+      frequency_days: ev.frequency_days && ev.frequency_days >= 1 && ev.frequency_days <= 365 ? Math.round(ev.frequency_days) : null,
+      plant_id,
+      product_id,
+    });
+    if (!error) hechos.push(`${esFuturo ? 'Programado' : 'Anotado'} el ${fechaCorta(ev.fecha)}: ${nota.slice(0, 90)}`);
+  }
+
+  // Los enlaces a lo recién creado se construyen aquí, no los elige la IA:
+  // así apuntan a la ficha concreta y no a «nuevo», que duplicaría el alta.
+  const enlacesCreados: { href: string; etiqueta: string }[] = [];
+
+  for (const pr of (r.productos || []).slice(0, 2)) {
+    const nombre = pr.nombre?.trim().slice(0, 120);
+    if (!nombre) continue;
+    if ((products || []).some(x => limpia(x.name) === limpia(nombre))) continue;
+    const tipo = pr.tipo?.trim().slice(0, 60) || 'Otro';
+    const pauta = await deducirFrecuencia(nombre, tipo, pr.descripcion || '');
+    const { data: creado } = await supabase.from('products').insert({
+      user_id: user.id,
+      name: nombre,
+      type: tipo,
+      description: pr.descripcion?.slice(0, 400) || null,
+      frequency_days: pauta.frequency_days,
+      frequency_source: 'ia',
+    }).select('id').single();
+    if (creado?.id) {
+      hechos.push(`Producto en el inventario: ${nombre} (${tipo})${pauta.frequency_days ? `, pauta orientativa de ${pauta.frequency_days} días` : ''}`);
+      enlacesCreados.push({ href: `/products/${creado.id}/edit`, etiqueta: `Completar ficha de ${nombre}` });
+    }
+  }
+
+  for (const pl of (r.plantas || []).slice(0, 2)) {
+    const nombre = pl.nombre?.trim().slice(0, 120);
+    if (!nombre) continue;
+    if ((plants || []).some(x => limpia(x.name) === limpia(nombre))) continue;
+    const { data: creada } = await supabase.from('plants').insert({
+      user_id: user.id,
+      name: nombre,
+      species: pl.especie?.slice(0, 120) || null,
+      icon_category: categoriaDeEspecie(pl.especie || null, nombre),
+    }).select('id').single();
+    if (creada?.id) {
+      hechos.push(`Planta registrada: ${nombre}${pl.especie ? ` (${pl.especie})` : ''} — ubícala en el mapa`);
+      enlacesCreados.push({ href: `/plants/${creada.id}/edit`, etiqueta: `Completar ficha de ${nombre}` });
+    }
+  }
+
+  if (hechos.length > 0) {
+    revalidatePath('/');
+    revalidatePath('/calendar');
+    revalidatePath('/plants');
+    revalidatePath('/products');
+  }
+
+  // Si ya se ha creado la ficha, el enlace genérico de «nueva planta / nuevo
+  // producto» sobra: sustituirlo por el de la ficha concreta evita el duplicado.
+  const yaCreadas = { nueva_planta: r.plantas?.length ?? 0, inventario: r.productos?.length ?? 0 };
+  const sugeridos = [...new Set((r.enlaces || []).filter(e => ENLACES_ASISTENTE[e]))]
+    .filter(e => !(e === 'nueva_planta' && yaCreadas.nueva_planta > 0) && !(e === 'inventario' && yaCreadas.inventario > 0))
+    .map(e => ENLACES_ASISTENTE[e]);
+
+  const enlaces = [...enlacesCreados, ...sugeridos].slice(0, 3);
+  return { respuesta: r.respuesta?.trim().slice(0, 900) || 'Hecho.', hechos, enlaces };
 }

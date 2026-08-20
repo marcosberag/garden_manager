@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { setPlantLocation, saveUserParcel, removePlantLocation, setPlantPath } from '@/app/actions';
 
@@ -193,6 +194,19 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
     setDrawingPath([]);
     setSelectedPlantId(null);
     setPlacementType('point');
+  };
+
+  const pedirCambioParcela = () => {
+    setModal({
+      type: 'confirm',
+      message: "¿Estás seguro de que quieres borrar el plano de la parcela actual?",
+      onConfirm: () => {
+        setParcel(null);
+        setHideSearchForm(true);
+        setModal(null);
+      },
+      onCancel: () => setModal(null)
+    });
   };
 
   const executeCatastroExtraction = async (lat: number, lon: number, refcat?: string) => {
@@ -515,7 +529,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
         </div>
       )}
 
-      {parcel && (
+      {parcel && unplacedPlants.length > 0 && (
         <div style={{
           position: 'absolute',
           bottom: '20px',
@@ -617,45 +631,37 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                   👇 Selecciona una para ubicarla.
                 </p>
               )}
-            </>
-          ) : (
-            <>
-              <p style={{ fontSize: '11px', color: 'var(--color-graphite)', margin: '0 0 10px 0', textAlign: 'center', lineHeight: '1.3' }}>
-                ¡Enhorabuena! Todas tus plantas están ubicadas.
-              </p>
-              <a 
-                href="/plants/new" 
-                className="btn-solid" 
-                style={{ display: 'block', textAlign: 'center', textDecoration: 'none', padding: '6px', fontSize: '11px', marginBottom: '8px' }}
+              <button
+                onClick={pedirCambioParcela}
+                style={{
+                  display: 'block', margin: '8px auto 0', background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase',
+                  color: 'var(--color-slate-smoke)', padding: 0,
+                }}
               >
-                + NUEVA PLANTA
-              </a>
+                Cambiar parcela
+              </button>
             </>
-          )}
-          <hr style={{ border: 'none', borderTop: '1px solid var(--color-mist)', margin: '10px 0' }} />
-          <button 
-            onClick={() => {
-              setModal({
-                type: 'confirm',
-                message: "¿Estás seguro de que quieres borrar el plano de la parcela actual?",
-                onConfirm: () => {
-                  setParcel(null);
-                  setHideSearchForm(true);
-                  setModal(null);
-                },
-                onCancel: () => setModal(null)
-              });
-            }}
-            className="btn-outline"
-            style={{
-              width: '100%',
-              padding: '10px 15px',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: 'var(--color-alert)'
-            }}
+          ) : null}
+        </div>
+      )}
+
+      {/* Con todo ubicado, el mapa queda limpio: solo dos chips discretos. */}
+      {parcel && unplacedPlants.length === 0 && (
+        <div style={{ position: 'absolute', bottom: '20px', left: '12px', zIndex: 1000, display: 'flex', gap: '6px' }}>
+          <Link
+            href="/plants/new"
+            className="chip-btn"
+            style={{ backgroundColor: 'rgba(255,255,255,0.92)', boxShadow: '0 2px 8px rgba(9,53,46,0.18)' }}
           >
-            CAMBIAR PARCELA
+            + Planta
+          </Link>
+          <button
+            onClick={pedirCambioParcela}
+            className="chip-btn"
+            style={{ backgroundColor: 'rgba(255,255,255,0.92)', boxShadow: '0 2px 8px rgba(9,53,46,0.18)', color: 'var(--color-slate-smoke)' }}
+          >
+            Cambiar parcela
           </button>
         </div>
       )}

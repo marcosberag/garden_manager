@@ -598,7 +598,8 @@ textarea.input-field {
 
   .home-map {
     flex: none;
-    height: 44vh;
+    height: 38vh;
+    min-height: 240px;
   }
 
   .home-panel {
@@ -657,5 +658,36 @@ textarea.input-field {
 
   .topbar-links {
     gap: 12px;
+  }
+}
+
+/* Pantallas estrechas: que la topbar quepa entera, sin enlaces cortados. */
+@media (max-width: 520px) {
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .topbar-links {
+    gap: 9px;
+  }
+
+  .topbar-link {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .topbar-brand {
+    letter-spacing: 0.16em;
+  }
+
+  .topbar .chip-btn {
+    padding: 5px 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar-brand span {
+    display: none;
   }
 }

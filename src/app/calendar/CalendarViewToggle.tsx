@@ -32,7 +32,10 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [isPending, startTransition] = useTransition();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Fecha local del dispositivo: con toISOString (UTC) la agenda seguía
+  // marcando "Hoy" el día anterior hasta las 2 de la madrugada.
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   // Funciones de utilidad para el Grid
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -41,7 +44,6 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
     return day === 0 ? 6 : day - 1; // Lunes = 0, Domingo = 6
   };
 
-  const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -353,14 +355,14 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
-        <div style={{ display: 'flex', backgroundColor: 'var(--color-ash-gray)', borderRadius: '10px', padding: '3px', border: '1px solid var(--color-lichen)' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <div style={{ display: 'flex', backgroundColor: 'var(--color-ash-gray)', borderRadius: '10px', padding: '2px', border: '1px solid var(--color-lichen)' }}>
           {(['list', 'grid'] as const).map(v => (
             <button
               key={v}
               onClick={() => setView(v)}
               style={{
-                padding: '5px 14px', borderRadius: '8px',
+                padding: '4px 12px', borderRadius: '8px',
                 fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 500,
                 letterSpacing: '0.1em', textTransform: 'uppercase', border: 'none',
                 backgroundColor: view === v ? 'white' : 'transparent',

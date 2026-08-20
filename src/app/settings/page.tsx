@@ -5,6 +5,7 @@ import { addContact, deleteContact } from './actions';
 
 import TestWhatsAppButton from './TestWhatsAppButton';
 import RunCronButton from './RunCronButton';
+import RecalcularPautasButton from './RecalcularPautasButton';
 import ClearEventsButton from '@/app/ClearEventsButton';
 import PlanAnual from './PlanAnual';
 
@@ -81,6 +82,16 @@ export default async function SettingsPage() {
             </div>
             
             <RunCronButton />
+
+            <div className="card" style={{ marginTop: '24px' }}>
+              <p className="eyebrow" style={{ marginBottom: '8px' }}>Pautas de la IA</p>
+              <p style={{ margin: '0 0 15px 0', fontSize: '12px', color: 'var(--color-slate-smoke)' }}>
+                Repasa las tareas programadas y ajusta la frecuencia de cada una a su caso
+                (producto, planta y modo de aplicación). También reactiva los tratamientos
+                con pauta que se quedaron sin avisos.
+              </p>
+              <RecalcularPautasButton />
+            </div>
 
             <PlanAnual />
 
