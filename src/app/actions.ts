@@ -1263,7 +1263,8 @@ export type RespuestaAsistente = {
 };
 
 const ENLACES_ASISTENTE: Record<EnlaceAsistente, { href: string; etiqueta: string }> = {
-  inventario: { href: '/products/new', etiqueta: 'Añadir producto (escanea la etiqueta)' },
+  inventario: { href: '/products', etiqueta: 'Ver inventario' },
+  nuevo_producto: { href: '/products/new', etiqueta: 'Añadir producto (escanea la etiqueta)' },
   nueva_planta: { href: '/plants/new', etiqueta: 'Añadir planta con foto' },
   nuevo_tratamiento: { href: '/calendar/new', etiqueta: 'Registrar tratamiento' },
   recorrido: { href: '/recorrido', etiqueta: 'Iniciar recorrido' },
@@ -1385,9 +1386,10 @@ export async function consultarAsistente(
 
   // Si ya se ha creado la ficha, el enlace genérico de «nueva planta / nuevo
   // producto» sobra: sustituirlo por el de la ficha concreta evita el duplicado.
-  const yaCreadas = { nueva_planta: r.plantas?.length ?? 0, inventario: r.productos?.length ?? 0 };
+  const creoPlanta = (r.plantas?.length ?? 0) > 0;
+  const creoProducto = (r.productos?.length ?? 0) > 0;
   const sugeridos = [...new Set((r.enlaces || []).filter(e => ENLACES_ASISTENTE[e]))]
-    .filter(e => !(e === 'nueva_planta' && yaCreadas.nueva_planta > 0) && !(e === 'inventario' && yaCreadas.inventario > 0))
+    .filter(e => !(e === 'nueva_planta' && creoPlanta) && !(e === 'nuevo_producto' && creoProducto))
     .map(e => ENLACES_ASISTENTE[e]);
 
   const enlaces = [...enlacesCreados, ...sugeridos].slice(0, 3);
