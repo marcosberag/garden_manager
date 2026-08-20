@@ -77,7 +77,7 @@ export default function PlanAnual() {
       <textarea
         className="input-field"
         rows={2}
-        placeholder="Ej: la plaga de las palmeras es Paysandisia (no picudo); oídio en los leylandis en los meses húmedos…"
+        placeholder="Ej: la plaga de las palmeras es Paysandisia, no picudo; a los leylandis se les amarronan las ramas por dentro…"
         value={indicaciones}
         onChange={e => setIndicaciones(e.target.value)}
         style={{ marginBottom: '12px' }}

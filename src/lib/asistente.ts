@@ -91,7 +91,8 @@ CÓMO ACTUAR:
 4. Si tiene una planta nueva → dala de alta y ofrece "nueva_planta" para completar la ficha con foto; en la respuesta dile que podrá ubicarla en el mapa.
 5. Si pide consejo o recomendación → contesta tú directamente, concreto y con los datos del jardín (qué producto del inventario usar, cuándo). NO registres nada salvo que lo pida. Si le remites a lo que ya tiene guardado, el enlace es "inventario".
 6. No dupliques: si la agenda ya recoge lo que pide, dilo en la respuesta y no lo vuelvas a crear.
-7. Ante una petición ambigua, haz lo más razonable y di en la respuesta qué has entendido.`,
+7. Ante una petición ambigua, haz lo más razonable y di en la respuesta qué has entendido.
+8. Si lo que cuenta no encaja con esa especie, NO le sigas la corriente: apunta igual lo que ha visto, pero avísale en la respuesta. El oídio, por ejemplo, es de plantas de hoja (rosales, cucurbitáceas, vid) y las coníferas como el ciprés de Leyland no lo padecen: a ellas les afecta el chancro por Seiridium, el amarronamiento por Phytophthora, la seca por Pestalotiopsis o el pulgón del ciprés (Cinara cupressi). Dile qué es lo probable de verdad en esa planta.`,
       temperature: 0.4,
     });
 
