@@ -53,6 +53,11 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
               <div style={{ display: 'flex', gap: '20px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
                   <label htmlFor="date" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>Fecha *</label>
+                  {event.frequency_days ? (
+                    <p style={{ margin: '-4px 0 0 0', fontSize: '11px', color: 'var(--color-slate-smoke)' }}>
+                      Si la cambias, los siguientes avisos se recolocan solos cada {event.frequency_days} días desde la nueva fecha.
+                    </p>
+                  ) : null}
                   <input 
                     type="date" 
                     id="date" 

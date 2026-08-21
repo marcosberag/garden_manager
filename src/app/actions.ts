@@ -508,7 +508,7 @@ export async function updateEvent(id: string, formData: FormData) {
   // entierre solo en el historial en cuanto pase su fecha.
   const { data: previo } = await supabase
     .from('events')
-    .select('notes')
+    .select('notes, date, frequency_days')
     .match({ id, user_id: user.id })
     .single();
 
@@ -533,7 +533,49 @@ export async function updateEvent(id: string, formData: FormData) {
     throw new Error('Error al actualizar el evento en la base de datos');
   }
 
+  // Mover una fecha descolocaba la pauta: el resto de avisos se quedaban donde
+  // estaban y entre uno y otro ya no había los días que tocaban. Si la tarea
+  // tiene pauta y la fecha ha cambiado, los siguientes se recolocan a partir
+  // de la nueva.
+  const pauta = previo ? leerFrecuencia(previo) : 0;
+  if (pauta > 0 && previo?.date && previo.date !== date) {
+    let borrar = supabase.from('events').delete()
+      .eq('user_id', user.id)
+      .eq('type', type)
+      .neq('id', id)
+      .gt('date', date)
+      .like('notes', '%[PROGRAMADO]%')
+      .not('notes', 'like', '%[HECHO]%');
+
+    if (plant_id) borrar = borrar.eq('plant_id', plant_id);
+    else borrar = borrar.is('plant_id', null);
+    if (product_id) borrar = borrar.eq('product_id', product_id);
+    else borrar = borrar.is('product_id', null);
+
+    await borrar;
+
+    const enTexto = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const [aa, mm, dd] = date.split('-').map(Number);
+    const siguiente = new Date(aa, mm - 1, dd);
+
+    const nuevos = [];
+    for (let i = 0; i < 3; i++) {
+      siguiente.setDate(siguiente.getDate() + pauta);
+      nuevos.push({
+        user_id: user.id,
+        type,
+        date: enTexto(siguiente),
+        notes: `[PROGRAMADO] Tarea programada cada ${pauta} días.`,
+        frequency_days: pauta,
+        plant_id: plant_id || null,
+        product_id: product_id || null,
+      });
+    }
+    await supabase.from('events').insert(nuevos);
+  }
+
   revalidatePath('/');
+  revalidatePath('/calendar');
   if (plant_id) {
     revalidatePath(`/plants/${plant_id}`);
   }
