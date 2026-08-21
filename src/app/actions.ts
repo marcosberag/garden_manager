@@ -491,10 +491,28 @@ export async function updateEvent(id: string, formData: FormData) {
     throw new Error('Tipo y fecha son obligatorios');
   }
 
+  // Las etiquetas de estado no pueden perderse al editar. El formulario enseña
+  // la nota en crudo, así que basta con que el usuario borre el "[PROGRAMADO]"
+  // que le afea el texto para que el aviso deje de contar como pendiente y se
+  // entierre solo en el historial en cuanto pase su fecha.
+  const { data: previo } = await supabase
+    .from('events')
+    .select('notes')
+    .match({ id, user_id: user.id })
+    .single();
+
+  let notasFinales = notes?.trim() || '';
+  const etiquetasPrevias = (previo?.notes || '').match(/\[(PROGRAMADO|POSPUESTO|HECHO|FIN)\]/g) || [];
+  for (const etiqueta of etiquetasPrevias) {
+    if (!notasFinales.includes(etiqueta)) {
+      notasFinales = notasFinales ? `${etiqueta} ${notasFinales}` : etiqueta;
+    }
+  }
+
   const { error } = await supabase.from('events').update({
     type,
     date,
-    notes: notes || null,
+    notes: notasFinales || null,
     plant_id: plant_id || null,
     product_id: product_id || null
   }).match({ id, user_id: user.id });

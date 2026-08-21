@@ -123,11 +123,14 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <label htmlFor="notes" style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--color-graphite)' }}>Notas adicionales</label>
+                <p style={{ margin: '-4px 0 0 0', fontSize: '11px', color: 'var(--color-slate-smoke)' }}>
+                  Escribe solo tus notas: si es un aviso programado, sigue siéndolo aunque aquí no lo veas.
+                </p>
                 <textarea 
                   id="notes" 
                   name="notes" 
                   rows={3}
-                  defaultValue={event.notes || ''}
+                  defaultValue={(event.notes || '').replace(/\[(PROGRAMADO|POSPUESTO|HECHO|FIN)\]/g, '').trim()}
                   placeholder="Ej: Apliqué aceite de neem en el envés de las hojas porque vi algo de mosca blanca..."
                   style={{
                     padding: '15px', backgroundColor: 'var(--color-pure-canvas)', border: '1px solid var(--color-mist)',
