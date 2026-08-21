@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useTransition } from 'react';
+import { estadoDeEvento } from '@/lib/estado-evento';
 
 interface Event {
   id: string;
@@ -46,21 +47,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const dayNames = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
-  /**
-   * En qué estado está un evento. La rejilla y la lista tienen que contar lo
-   * mismo: antes la rejilla pintaba un ✓ en todo, incluidas las tareas que aún
-   * no se habían hecho.
-   */
-  const estadoDe = (e: Event): 'hecho' | 'atrasado' | 'hoy' | 'futuro' => {
-    const notas = e.notes || '';
-    if (notas.includes('[HECHO]') || notas.includes('[FIN]')) return 'hecho';
-    // Sin la etiqueta [PROGRAMADO] no es un aviso, es el registro de algo ya
-    // aplicado; solo sigue "vivo" el mismo día en que se anotó.
-    if (!notas.includes('[PROGRAMADO]')) return e.date < todayStr ? 'hecho' : 'hoy';
-    if (e.date < todayStr) return 'atrasado';
-    if (e.date === todayStr) return 'hoy';
-    return 'futuro';
-  };
+  const estadoDe = (e: Event) => estadoDeEvento(e.notes, e.date, todayStr);
 
   const COLOR_ESTADO = {
     hecho: { fondo: 'var(--color-ash-gray)', texto: 'var(--color-slate-smoke)', marca: '✓' },
@@ -377,6 +364,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0 0' }}>
               <span className="field-label" style={{ fontSize: '10px' }}>[ Historial ]</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--color-slate-smoke)' }}>↩ no lo hice</span>
               <div className="hairline" style={{ flex: 1, width: 'auto' }} />
             </div>
             <div>
@@ -391,6 +379,22 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
                       {tituloDe(item)}
                     </span>
                     {info.fin && <span className="tag tag--muted">Fin</span>}
+                    {item.id && !info.fin && (
+                      <button
+                        style={{ ...enlace, fontSize: '11px' }}
+                        disabled={isPending}
+                        title="No lo hice: devolver a pendientes"
+                        aria-label="Devolver a pendientes"
+                        onClick={() => {
+                          startTransition(async () => {
+                            const { reabrirEvento } = await import('@/app/actions');
+                            await reabrirEvento(item.id);
+                          });
+                        }}
+                      >
+                        ↩
+                      </button>
+                    )}
                     {item.id && <a href={`/calendar/${item.id}/edit`} style={{ ...enlace, fontSize: '11px' }} aria-label="Editar registro">✎</a>}
                   </div>
                 );

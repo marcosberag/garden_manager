@@ -413,11 +413,22 @@ export async function addEvent(formData: FormData) {
     }
   }
 
+  // Una fecha que aún no ha llegado es un plan, no el registro de algo hecho.
+  // Sin marcarla como aviso, al pasar el día la agenda la tomaba por una
+  // aplicacion antigua y la archivaba sola en el historial: el tratamiento
+  // desaparecia sin que nadie lo hubiera dado por hecho.
+  const hoyStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+
   const eventsToInsert = finalDates.map(d => ({
     user_id: user.id,
     type,
     date: d,
-    notes: notasFinales,
+    notes: d > hoyStr
+      ? `[PROGRAMADO] ${notasFinales || 'Tratamiento previsto.'}`
+      : notasFinales,
     frequency_days: frequency_days > 0 ? frequency_days : null,
     plant_id: plant_id || null,
     product_id: product_id || null
@@ -1412,4 +1423,32 @@ export async function consultarAsistente(
 
   const enlaces = [...enlacesCreados, ...sugeridos].slice(0, 3);
   return { respuesta: r.respuesta?.trim().slice(0, 900) || 'Hecho.', hechos, enlaces };
+}
+
+/**
+ * Devuelve a la lista de pendientes un evento que se había archivado en el
+ * historial. Hace falta porque hasta ahora una fecha futura registrada a mano
+ * se guardaba sin marca de aviso y, al pasar el día, la agenda la daba por
+ * hecha sola. El dueño dice si se hizo o no; aquí no se adivina.
+ */
+export async function reabrirEvento(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data: evento } = await supabase
+    .from('events')
+    .select('notes')
+    .match({ id, user_id: user.id })
+    .single();
+
+  let notas = (evento?.notes || '').replace(/\[(HECHO|FIN)\]/g, '').trim();
+  if (!notas.includes('[PROGRAMADO]')) {
+    notas = notas ? `[PROGRAMADO] ${notas}` : '[PROGRAMADO]';
+  }
+
+  await supabase.from('events').update({ notes: notas }).match({ id, user_id: user.id });
+
+  revalidatePath('/');
+  revalidatePath('/calendar');
 }
