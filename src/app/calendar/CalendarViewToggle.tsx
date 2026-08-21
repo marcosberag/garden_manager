@@ -3,15 +3,6 @@
 
 import React, { useState, useTransition } from 'react';
 
-interface Recommendation {
-  type: string;
-  plant_name: string;
-  product_name: string;
-  reason: string;
-  date: string;
-  urgency: string;
-}
-
 interface Event {
   id: string;
   type: string;
@@ -24,12 +15,12 @@ interface Event {
 }
 
 interface CalendarViewToggleProps {
-  recommendations: Recommendation[];
   events: Event[];
 }
 
-export default function CalendarViewToggle({ recommendations, events }: CalendarViewToggleProps) {
+export default function CalendarViewToggle({ events }: CalendarViewToggleProps) {
   const [view, setView] = useState<'list' | 'grid'>('list');
+  const [mesOffset, setMesOffset] = useState(0);
   const [isPending, startTransition] = useTransition();
 
   // Fecha local del dispositivo: con toISOString (UTC) la agenda seguía
@@ -44,13 +35,39 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
     return day === 0 ? 6 : day - 1; // Lunes = 0, Domingo = 6
   };
 
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
+  // El mes que se está mirando, que ya no tiene por qué ser el actual: sin
+  // navegación no había forma de ver los avisos del plan anual.
+  const mesVisible = new Date(today.getFullYear(), today.getMonth() + mesOffset, 1);
+  const currentYear = mesVisible.getFullYear();
+  const currentMonth = mesVisible.getMonth();
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
 
   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const dayNames = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+
+  /**
+   * En qué estado está un evento. La rejilla y la lista tienen que contar lo
+   * mismo: antes la rejilla pintaba un ✓ en todo, incluidas las tareas que aún
+   * no se habían hecho.
+   */
+  const estadoDe = (e: Event): 'hecho' | 'atrasado' | 'hoy' | 'futuro' => {
+    const notas = e.notes || '';
+    if (notas.includes('[HECHO]') || notas.includes('[FIN]')) return 'hecho';
+    // Sin la etiqueta [PROGRAMADO] no es un aviso, es el registro de algo ya
+    // aplicado; solo sigue "vivo" el mismo día en que se anotó.
+    if (!notas.includes('[PROGRAMADO]')) return e.date < todayStr ? 'hecho' : 'hoy';
+    if (e.date < todayStr) return 'atrasado';
+    if (e.date === todayStr) return 'hoy';
+    return 'futuro';
+  };
+
+  const COLOR_ESTADO = {
+    hecho: { fondo: 'var(--color-ash-gray)', texto: 'var(--color-slate-smoke)', marca: '✓' },
+    atrasado: { fondo: 'var(--color-alert-wash)', texto: 'var(--color-alert)', marca: '!' },
+    hoy: { fondo: 'var(--color-deep-fern)', texto: 'white', marca: '●' },
+    futuro: { fondo: 'var(--color-forest-ink)', texto: 'white', marca: '' },
+  } as const;
 
   const renderGrid = () => {
     const days = [];
@@ -63,9 +80,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
     // Días del mes
     for (let i = 1; i <= daysInMonth; i++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      const isToday = i === today.getDate();
-
-      const dayRecs = recommendations.filter(r => r.date === dateStr);
+      const isToday = dateStr === todayStr;
       const dayEvents = events.filter(e => e.date === dateStr);
 
       days.push(
@@ -74,6 +89,7 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
           minHeight: '70px',
           backgroundColor: 'white',
           border: `1px solid ${isToday ? 'var(--color-deep-fern)' : 'var(--color-lichen)'}`,
+          boxShadow: isToday ? 'inset 0 0 0 1px var(--color-deep-fern)' : 'none',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
@@ -89,26 +105,45 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
             {i}
           </span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
-            {dayEvents.map(e => (
-              <div key={e.id} style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', backgroundColor: 'var(--color-ash-gray)', color: 'var(--color-deep-fern)', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${e.type} (Hecho)`}>
-                ✓ {e.type}
-              </div>
-            ))}
-            {dayRecs.map((r, idx) => (
-              <div key={`rec-${idx}`} style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', backgroundColor: r.urgency === 'alta' ? 'var(--color-alert-wash)' : 'var(--color-forest-ink)', color: r.urgency === 'alta' ? 'var(--color-alert)' : 'white', padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.type}>
-                {r.type}
-              </div>
-            ))}
+            {dayEvents.map(e => {
+              const c = COLOR_ESTADO[estadoDe(e)];
+              const etiqueta = e.products?.name || e.type;
+              return (
+                <div
+                  key={e.id}
+                  style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', backgroundColor: c.fondo, color: c.texto, padding: '2px 4px', borderRadius: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  title={`${etiqueta}${e.plants?.name ? ` en ${e.plants.name}` : ''}`}
+                >
+                  {c.marca ? `${c.marca} ` : ''}{etiqueta}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
     }
 
+    const leyenda = [
+      { estado: 'atrasado', texto: 'Atrasado' },
+      { estado: 'hoy', texto: 'Hoy' },
+      { estado: 'futuro', texto: 'Programado' },
+      { estado: 'hecho', texto: 'Hecho' },
+    ] as const;
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: '20px' }}>
-        <h4 className="suisse" style={{ textAlign: 'center', margin: '0 0 15px 0', fontSize: '15px' }}>
-          {monthNames[currentMonth]} {currentYear}
-        </h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 12px 0' }}>
+          <button onClick={() => setMesOffset(m => m - 1)} className="chip-btn" aria-label="Mes anterior">←</button>
+          <h4 className="suisse" style={{ textAlign: 'center', margin: 0, fontSize: '15px' }}>
+            {monthNames[currentMonth]} {currentYear}
+          </h4>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            {mesOffset !== 0 && (
+              <button onClick={() => setMesOffset(0)} className="chip-btn" aria-label="Volver a este mes">Hoy</button>
+            )}
+            <button onClick={() => setMesOffset(m => m + 1)} className="chip-btn" aria-label="Mes siguiente">→</button>
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', borderBottom: '1px solid var(--color-lichen)', paddingBottom: '5px' }}>
           {dayNames.map(d => (
             <div key={d} style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '10px', fontWeight: 500, color: 'var(--color-slate-smoke)' }}>{d}</div>
@@ -117,19 +152,13 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0', borderLeft: '1px solid var(--color-lichen)', borderTop: '1px solid var(--color-lichen)' }}>
           {days}
         </div>
-        <div style={{ marginTop: '15px', display: 'flex', gap: '15px', justifyContent: 'center', fontSize: '10px', color: 'var(--color-slate-smoke)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-ash-gray)', border: '1px solid var(--color-lichen)', borderRadius: '2px' }}></div>
-            <span>Registro</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-forest-ink)', borderRadius: '2px' }}></div>
-            <span>Tarea Pendiente</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--color-alert-wash)', border: '1px solid var(--color-alert)', borderRadius: '2px' }}></div>
-            <span>Urgente</span>
-          </div>
+        <div style={{ marginTop: '15px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', fontSize: '10px', color: 'var(--color-slate-smoke)' }}>
+          {leyenda.map(l => (
+            <div key={l.estado} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: '10px', height: '10px', backgroundColor: COLOR_ESTADO[l.estado].fondo, border: '1px solid var(--color-lichen)', borderRadius: '2px' }}></div>
+              <span>{l.texto}</span>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -193,21 +222,25 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
   const renderList = () => {
     const combinedList = [
-      ...recommendations.map(r => ({ ...r, isPast: false })),
-      ...events.map(e => ({
-        id: e.id,
-        type: e.type,
-        plant_id: e.plant_id,
-        product_id: e.product_id,
-        plant_name: e.plants?.name || e.plants?.species || 'General',
-        product_name: e.products?.name || '',
-        reason: e.notes || '',
-        frequency_days: e.frequency_days,
-        date: e.date,
-        urgency: e.date <= todayStr ? (e.date < todayStr ? 'alta' : 'media') : 'baja',
-        isPast: e.notes?.includes('[HECHO]') || (e.date < todayStr && !e.notes?.includes('[PROGRAMADO]')),
-        isSuggestion: e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')
-      }))
+      // El estado sale del mismo sitio que usa la rejilla, para que las dos
+      // vistas no puedan contradecirse.
+      ...events.map(e => {
+        const estado = estadoDe(e);
+        return {
+          id: e.id,
+          type: e.type,
+          plant_id: e.plant_id,
+          product_id: e.product_id,
+          plant_name: e.plants?.name || e.plants?.species || 'General',
+          product_name: e.products?.name || '',
+          reason: e.notes || '',
+          frequency_days: e.frequency_days,
+          date: e.date,
+          urgency: estado === 'atrasado' ? 'alta' : (estado === 'hoy' ? 'media' : 'baja'),
+          isPast: estado === 'hecho',
+          isSuggestion: e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'),
+        };
+      })
     ];
 
     combinedList.sort((a, b) => {
@@ -233,10 +266,12 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
 
     const pendientes = combinedList.filter(i => !i.isPast);
     const historial = combinedList.filter(i => i.isPast);
+    // Lo atrasado va primero y bajo su propio rótulo: es lo único que obliga a
+    // decidir algo hoy, y antes se perdía entre los avisos futuros.
+    const atrasados = pendientes.filter(i => i.urgency === 'alta');
+    const proximos = pendientes.filter(i => i.urgency !== 'alta');
 
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {pendientes.map((item, idx) => {
+    const tarjeta = (item, idx) => {
           const isUrgent = item.urgency === 'alta';
           const isToday = item.urgency === 'media';
           const info = parseReason(item.reason, item.frequency_days);
@@ -321,8 +356,22 @@ export default function CalendarViewToggle({ recommendations, events }: Calendar
                 </div>
               )}
             </div>
-          );
-        })}
+      );
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {atrasados.length > 0 && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span className="field-label" style={{ fontSize: '10px', color: 'var(--color-alert)' }}>[ Atrasado ]</span>
+              <div className="hairline" style={{ flex: 1, width: 'auto' }} />
+            </div>
+            {atrasados.map(tarjeta)}
+          </>
+        )}
+
+        {proximos.map(tarjeta)}
 
         {historial.length > 0 && (
           <>
