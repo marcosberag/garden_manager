@@ -314,9 +314,25 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
                   </div>
                   {(item.isSuggestion || isUrgent || isToday) && (
                     <div style={{ display: 'flex', gap: '5px' }}>
+                      {isUrgent && (
+                        <button
+                          className="chip-btn"
+                          disabled={isPending}
+                          title="Lo hago hoy: traer el aviso a la fecha de hoy"
+                          onClick={() => {
+                            startTransition(async () => {
+                              const { pasarAHoy } = await import('@/app/actions');
+                              await pasarAHoy(item.id);
+                            });
+                          }}
+                        >
+                          Hoy
+                        </button>
+                      )}
                       <button
                         className="chip-btn"
                         disabled={isPending}
+                        title={isUrgent ? 'Dejarlo para mañana' : 'Aplazarlo un día'}
                         onClick={() => {
                           startTransition(async () => {
                             const { postponeEvent } = await import('@/app/actions');
@@ -324,7 +340,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
                           });
                         }}
                       >
-                        +1 día
+                        {isUrgent ? 'Mañana' : '+1 día'}
                       </button>
                       <button
                         className="chip-btn chip-btn--primary"

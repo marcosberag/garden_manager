@@ -584,6 +584,7 @@ export async function postponeEvent(id: string) {
     .from('events')
     .select(`
       type, 
+      date,
       notes, 
       plants(name), 
       products(name)
@@ -595,9 +596,17 @@ export async function postponeEvent(id: string) {
     throw new Error('No se pudo recuperar el evento');
   }
 
-  const tomorrowObj = new Date();
-  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-  const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth()+1).padStart(2,'0')}-${String(tomorrowObj.getDate()).padStart(2,'0')}`;
+  // Un día más tarde de lo que ya estaba, nunca hacia atrás. Antes se ponía
+  // siempre "mañana": en un aviso de dentro de diez días, "+1 día" lo
+  // adelantaba nueve en lugar de posponerlo.
+  const aFecha = (t: string) => { const [a, m, d] = t.split('-').map(Number); return new Date(a, m - 1, d); };
+  const enTexto = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const hoyObj = new Date();
+  hoyObj.setHours(0, 0, 0, 0);
+  const partida = event.date && aFecha(event.date) > hoyObj ? aFecha(event.date) : hoyObj;
+  partida.setDate(partida.getDate() + 1);
+  const tomorrowStr = enTexto(partida);
 
   const currentNotes = event.notes || '';
   const newNotes = currentNotes.includes('[POSPUESTO]') ? currentNotes : `${currentNotes} [POSPUESTO]`.trim();
@@ -1448,6 +1457,37 @@ export async function reabrirEvento(id: string) {
   }
 
   await supabase.from('events').update({ notes: notas }).match({ id, user_id: user.id });
+
+  revalidatePath('/');
+  revalidatePath('/calendar');
+}
+
+/**
+ * Mueve un aviso a hoy sin darlo por hecho: es lo que hace falta cuando algo
+ * se quedó atrasado y se piensa hacer hoy mismo. «+1 día» servía para
+ * aplazarlo, pero no había forma de traerlo al día de hoy.
+ */
+export async function pasarAHoy(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Usuario no autenticado');
+
+  const { data: evento } = await supabase
+    .from('events')
+    .select('notes')
+    .match({ id, user_id: user.id })
+    .single();
+
+  // Sigue pendiente, y deja de estar pospuesto: la intención es la contraria.
+  let notas = (evento?.notes || '').replace(/\[POSPUESTO\]/g, '').replace(/\s+/g, ' ').trim();
+  if (!notas.includes('[PROGRAMADO]')) {
+    notas = notas ? `[PROGRAMADO] ${notas}` : '[PROGRAMADO]';
+  }
+
+  const d = new Date();
+  const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  await supabase.from('events').update({ date: hoy, notes: notas }).match({ id, user_id: user.id });
 
   revalidatePath('/');
   revalidatePath('/calendar');
