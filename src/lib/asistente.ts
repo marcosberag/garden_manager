@@ -22,6 +22,12 @@ export type PlantaAsistente = {
   especie: string | null;
 };
 
+export type NotaFicha = {
+  sobre: 'producto' | 'planta';
+  nombre: string;
+  nota: string;
+};
+
 export type EnlaceAsistente = 'inventario' | 'nuevo_producto' | 'nueva_planta' | 'nuevo_tratamiento' | 'recorrido' | 'ajustes';
 
 export type PeticionInterpretada = {
@@ -29,6 +35,7 @@ export type PeticionInterpretada = {
   eventos: EventoAsistente[];
   productos: ProductoAsistente[];
   plantas: PlantaAsistente[];
+  notas: NotaFicha[];
   enlaces: EnlaceAsistente[];
 };
 
@@ -69,6 +76,11 @@ export async function interpretarPeticion(texto: string, contexto: ContextoAsist
           nombre: z.string(),
           especie: z.string().nullable(),
         })).describe('Plantas nuevas que el dueño dice tener. Vacío si no procede.'),
+        notas: z.array(z.object({
+          sobre: z.enum(['producto', 'planta']),
+          nombre: z.string().describe('Nombre EXACTO de un producto del inventario o de una planta del jardín, de las listas de arriba.'),
+          nota: z.string().describe('El dato a guardar en su ficha, en una frase corta y en limpio. Ej: "Máximo 3 aplicaciones en total".'),
+        })).describe('Datos que el dueño cuenta sobre algo que YA tiene y conviene guardar en su ficha: límites de uso, dosis que le dijo el vivero, dónde lo compró, cómo reacciona una planta... Vacío si no procede.'),
         enlaces: z.array(z.enum(['inventario', 'nuevo_producto', 'nueva_planta', 'nuevo_tratamiento', 'recorrido', 'ajustes'])).describe('Pantallas que conviene ofrecerle. "inventario" es CONSULTAR lo que ya tiene; "nuevo_producto" es DAR DE ALTA uno que acaba de comprar. Vacío si no hace falta ninguna.'),
       }),
       prompt: `Eres el asistente del jardín de la app Brotes. El dueño te escribe peticiones cortas y tú decides: qué anotar en la agenda, qué dar de alta y qué contestar. Hoy es ${contexto.hoy}.
@@ -91,8 +103,9 @@ CÓMO ACTUAR:
 4. Si tiene una planta nueva → dala de alta y ofrece "nueva_planta" para completar la ficha con foto; en la respuesta dile que podrá ubicarla en el mapa.
 5. Si pide consejo o recomendación → contesta tú directamente, concreto y con los datos del jardín (qué producto del inventario usar, cuándo). NO registres nada salvo que lo pida. Si le remites a lo que ya tiene guardado, el enlace es "inventario".
 6. No dupliques: si la agenda ya recoge lo que pide, dilo en la respuesta y no lo vuelvas a crear.
-7. Ante una petición ambigua, haz lo más razonable y di en la respuesta qué has entendido.
-8. Si lo que cuenta no encaja con esa especie, NO le sigas la corriente: apunta igual lo que ha visto, pero avísale en la respuesta. El oídio, por ejemplo, es de plantas de hoja — muy típico en evónimo (Euonymus), rosales, cucurbitáceas y vid — y las coníferas como el ciprés de Leyland no lo padecen: a ellas les afecta el chancro por Seiridium, el amarronamiento por Phytophthora, la seca por Pestalotiopsis o el pulgón del ciprés (Cinara cupressi). Dile qué es lo probable de verdad en esa planta. Esto es para corregir imposibles, no para dudar de lo que ve: si la enfermedad es propia de esa especie, dale la razón sin más.`,
+7. Si te cuenta un dato sobre algo que YA tiene — un límite de uso ("solo 3 aplicaciones en total"), una dosis que le dijo el vivero, una manía de una planta — guárdalo como nota en la ficha de ese producto o esa planta. Es memoria del jardín: se tendrá en cuenta al calcular pautas y al planificar el año. No lo conviertas en un evento de agenda.
+8. Ante una petición ambigua, haz lo más razonable y di en la respuesta qué has entendido.
+9. Si lo que cuenta no encaja con esa especie, NO le sigas la corriente: apunta igual lo que ha visto, pero avísale en la respuesta. El oídio, por ejemplo, es de plantas de hoja — muy típico en evónimo (Euonymus), rosales, cucurbitáceas y vid — y las coníferas como el ciprés de Leyland no lo padecen: a ellas les afecta el chancro por Seiridium, el amarronamiento por Phytophthora, la seca por Pestalotiopsis o el pulgón del ciprés (Cinara cupressi). Dile qué es lo probable de verdad en esa planta. Esto es para corregir imposibles, no para dudar de lo que ve: si la enfermedad es propia de esa especie, dale la razón sin más.`,
       temperature: 0.4,
     });
 

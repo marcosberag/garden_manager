@@ -1371,8 +1371,8 @@ export async function consultarAsistente(
   if (!peticion) return { ...vacio, error: 'Cuéntame algo primero.' };
 
   const [{ data: plants }, { data: products }, { data: events }] = await Promise.all([
-    supabase.from('plants').select('id, name, species').eq('user_id', user.id),
-    supabase.from('products').select('id, name, type').eq('user_id', user.id),
+    supabase.from('plants').select('id, name, species, description').eq('user_id', user.id),
+    supabase.from('products').select('id, name, type, description').eq('user_id', user.id),
     supabase.from('events').select('type, date, notes, plants(name), products(name)').order('date', { ascending: false }).limit(25),
   ]);
 
@@ -1455,6 +1455,29 @@ export async function consultarAsistente(
       hechos.push(`Planta registrada: ${nombre}${pl.especie ? ` (${pl.especie})` : ''} — ubícala en el mapa`);
       enlacesCreados.push({ href: `/plants/${creada.id}/edit`, etiqueta: `Completar ficha de ${nombre}` });
     }
+  }
+
+  // Datos sobre lo que ya tiene: van a la ficha, no a la agenda. La descripción
+  // del producto la lee luego el motor de pautas, así que un «solo 3 veces en
+  // total» acaba pesando en lo que la app propone.
+  for (const nota of (r.notas || []).slice(0, 3)) {
+    const texto = nota.nota?.trim().slice(0, 200);
+    if (!texto || !nota.nombre) continue;
+    const tabla = nota.sobre === 'planta' ? 'plants' : 'products';
+    const fichas: { id: string; name: string; description?: string | null }[] =
+      nota.sobre === 'planta' ? (plants || []) : (products || []);
+    const ficha = fichas.find(x => limpia(x.name) === limpia(nota.nombre));
+    if (!ficha) continue;
+
+    const previa = (ficha.description || '').trim();
+    if (limpia(previa).includes(limpia(texto))) continue;
+    const descripcion = previa ? `${previa}
+${texto}` : texto;
+
+    const { error } = await supabase.from(tabla)
+      .update({ description: descripcion.slice(0, 1500) })
+      .match({ id: ficha.id, user_id: user.id });
+    if (!error) hechos.push(`Anotado en ${ficha.name}: ${texto}`);
   }
 
   if (hechos.length > 0) {
