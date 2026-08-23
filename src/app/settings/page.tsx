@@ -8,6 +8,7 @@ import RunCronButton from './RunCronButton';
 import RecalcularPautasButton from './RecalcularPautasButton';
 import ClearEventsButton from '@/app/ClearEventsButton';
 import PlanAnual from './PlanAnual';
+import MiembrosJardin from './MiembrosJardin';
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -81,6 +82,8 @@ export default async function SettingsPage() {
               </form>
             </div>
             
+            <MiembrosJardin />
+
             <RunCronButton />
 
             <div className="card" style={{ marginTop: '24px' }}>

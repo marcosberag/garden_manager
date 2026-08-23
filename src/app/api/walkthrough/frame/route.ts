@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { identificarPlantaEnFrame } from '@/lib/identificar-planta-frame';
+import { jardinDe } from '@/lib/jardin';
 
 // Analiza un fotograma del recorrido por el jardín. Exige sesión: cada llamada
 // gasta cuota de Gemini y el recorrido lanza muchas seguidas.
@@ -10,6 +11,8 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
+
+  const jardin = await jardinDe(supabase, user);
 
   let body: { imagen?: string; detectadas?: string[] };
   try {
@@ -26,7 +29,7 @@ export async function POST(req: Request) {
   const { data: plants } = await supabase
     .from('plants')
     .select('name, species')
-    .eq('user_id', user.id);
+    .eq('user_id', jardin.id);
 
   const deteccion = await identificarPlantaEnFrame(body.imagen, {
     detectadasEnRecorrido: (body.detectadas || []).slice(0, 40),

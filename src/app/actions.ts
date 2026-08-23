@@ -10,6 +10,7 @@ import { centroDeGeojson } from '@/lib/meteo';
 import { generarPlanAnual, type PropuestaPlan } from '@/lib/plan-anual';
 import { interpretarPeticion, type EnlaceAsistente } from '@/lib/asistente';
 import { aplicacionesDeLaTanda, cortePorInactividad } from '@/lib/tandas';
+import { jardinDe } from '@/lib/jardin';
 
 /**
  * Tope de aplicaciones que venga del formulario de producto. Vacío o fuera de
@@ -32,6 +33,8 @@ export async function addPlant(formData: FormData) {
   if (!user) {
     throw new Error('Usuario no autenticado');
   }
+
+  const jardin = await jardinDe(supabase, user);
 
   let name = formData.get('name') as string;
   const species = formData.get('species') as string;
@@ -71,7 +74,7 @@ export async function addPlant(formData: FormData) {
   const icon_category = await resolverCategoria(species, name);
 
   const { error } = await supabase.from('plants').insert({
-    user_id: user.id,
+    user_id: jardin.id,
     name,
     species,
     description,
@@ -100,6 +103,8 @@ export async function addProduct(formData: FormData) {
     throw new Error('Usuario no autenticado');
   }
 
+  const jardin = await jardinDe(supabase, user);
+
   const name = formData.get('name') as string;
   const type = formData.get('type') as string;
   const description = formData.get('description') as string;
@@ -118,7 +123,7 @@ export async function addProduct(formData: FormData) {
     : { ...(await deducirFrecuencia(name, type, description)), frequency_source: 'ia' };
 
   const { error } = await supabase.from('products').insert({
-    user_id: user.id,
+    user_id: jardin.id,
     name,
     type,
     description,
@@ -144,7 +149,9 @@ export async function deletePlant(id: string) {
 
   if (!user) throw new Error('No autenticado');
 
-  await supabase.from('plants').delete().match({ id, user_id: user.id });
+  const jardin = await jardinDe(supabase, user);
+
+  await supabase.from('plants').delete().match({ id, user_id: jardin.id });
   revalidatePath('/plants');
 }
 
@@ -153,6 +160,8 @@ export async function updatePlant(id: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('No autenticado');
+
+  const jardin = await jardinDe(supabase, user);
 
   let name = formData.get('name') as string;
   const species = formData.get('species') as string;
@@ -195,7 +204,7 @@ export async function updatePlant(id: string, formData: FormData) {
     updateData.image_url = image_url;
   }
 
-  await supabase.from('plants').update(updateData).match({ id, user_id: user.id });
+  await supabase.from('plants').update(updateData).match({ id, user_id: jardin.id });
   
   revalidatePath('/plants');
   redirect('/plants');
@@ -207,7 +216,9 @@ export async function deleteProduct(id: string) {
 
   if (!user) throw new Error('No autenticado');
 
-  await supabase.from('products').delete().match({ id, user_id: user.id });
+  const jardin = await jardinDe(supabase, user);
+
+  await supabase.from('products').delete().match({ id, user_id: jardin.id });
   revalidatePath('/products');
 }
 
@@ -216,6 +227,8 @@ export async function updateProduct(id: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('No autenticado');
+
+  const jardin = await jardinDe(supabase, user);
 
   const name = formData.get('name') as string;
   const type = formData.get('type') as string;
@@ -228,7 +241,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const { data: anterior } = await supabase
     .from('products')
     .select('frequency_days, frequency_source')
-    .match({ id, user_id: user.id })
+    .match({ id, user_id: jardin.id })
     .single();
 
   const frecuenciaFormulario = leerFrecuenciaDelFormulario(formData);
@@ -247,12 +260,12 @@ export async function updateProduct(id: string, formData: FormData) {
   await supabase
     .from('products')
     .update({ name, type, description, barcode: barcode || null, dosage: dosage || null, frequency_days, frequency_source, ...leerLimiteDelFormulario(formData) })
-    .match({ id, user_id: user.id });
+    .match({ id, user_id: jardin.id });
 
   // Si la pauta cambió, los avisos ya programados con este producto se
   // reprograman solos: no hay que acordarse de recalcular nada.
   if (frequency_days && frequency_days !== anterior?.frequency_days) {
-    await propagarFrecuenciaDeProducto(supabase, user.id, id, frequency_days);
+    await propagarFrecuenciaDeProducto(supabase, jardin.id, id, frequency_days);
     revalidatePath('/');
   }
   
@@ -266,10 +279,12 @@ export async function setPlantLocation(id: string, lat: number, lng: number) {
 
   if (!user) throw new Error('No autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { error } = await supabase
     .from('plants')
     .update({ lat, lng })
-    .match({ id, user_id: user.id });
+    .match({ id, user_id: jardin.id });
 
   if (error) {
     console.error('Error setting location', error);
@@ -286,10 +301,12 @@ export async function setPlantPath(id: string, path: [number, number][]) {
 
   if (!user) throw new Error('No autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { error } = await supabase
     .from('plants')
     .update({ path, lat: null, lng: null })
-    .match({ id, user_id: user.id });
+    .match({ id, user_id: jardin.id });
 
   if (error) {
     console.error('Error setting path', error);
@@ -306,10 +323,12 @@ export async function removePlantLocation(id: string) {
 
   if (!user) throw new Error('No autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { error } = await supabase
     .from('plants')
     .update({ lat: null, lng: null })
-    .match({ id, user_id: user.id });
+    .match({ id, user_id: jardin.id });
 
   if (error) {
     console.error('Error removing location', error);
@@ -326,15 +345,17 @@ export async function saveUserParcel(geojsonStr: string) {
 
   if (!user) throw new Error('No autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   // Check if parcel already exists
-  const { data: existing } = await supabase.from('parcels').select('id').eq('user_id', user.id).single();
+  const { data: existing } = await supabase.from('parcels').select('id').eq('user_id', jardin.id).single();
 
   let error;
   if (existing) {
     const { error: updateErr } = await supabase.from('parcels').update({ geojson: geojsonStr }).eq('id', existing.id);
     error = updateErr;
   } else {
-    const { error: insertErr } = await supabase.from('parcels').insert({ user_id: user.id, geojson: geojsonStr });
+    const { error: insertErr } = await supabase.from('parcels').insert({ user_id: jardin.id, geojson: geojsonStr });
     error = insertErr;
   }
 
@@ -351,6 +372,8 @@ export async function addEvent(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('Usuario no autenticado');
+
+  const jardin = await jardinDe(supabase, user);
 
   const type = formData.get('type') as string;
   const dates = formData.getAll('dates[]') as string[];
@@ -386,7 +409,7 @@ export async function addEvent(formData: FormData) {
   if (frequency_days > 0) {
     // Limpiar eventos programados antiguos para esta misma tarea
     let deleteQuery = supabase.from('events').delete()
-      .eq('user_id', user.id)
+      .eq('user_id', jardin.id)
       .eq('type', type)
       .like('notes', '%[PROGRAMADO]%');
       
@@ -417,7 +440,7 @@ export async function addEvent(formData: FormData) {
     
     for (let i = 0; i < 3; i++) {
       futureEventsToInsert.push({
-        user_id: user.id,
+        user_id: jardin.id,
         type,
         date: getLocalDateString(nextDate),
         notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días${etiquetaMetodo ? ` (aplicación ${etiquetaMetodo})` : ''}.${hastaCuando ? ` Revisar hasta: ${hastaCuando}.` : ''}`,
@@ -439,7 +462,7 @@ export async function addEvent(formData: FormData) {
   })();
 
   const eventsToInsert = finalDates.map(d => ({
-    user_id: user.id,
+    user_id: jardin.id,
     type,
     date: d,
     notes: d > hoyStr
@@ -460,13 +483,13 @@ export async function addEvent(formData: FormData) {
   // Insert future events if any, sin pasarse del límite del producto
   if (futureEventsToInsert.length > 0) {
     const tarea = { type, plant_id: plant_id || null, product_id: product_id || null };
-    const cupo = await cupoDeAplicaciones(supabase, user.id, tarea);
+    const cupo = await cupoDeAplicaciones(supabase, jardin.id, tarea);
     const permitidos = cupo ? Math.min(futureEventsToInsert.length, cupo.restantes) : futureEventsToInsert.length;
     if (permitidos > 0) {
       await supabase.from('events').insert(futureEventsToInsert.slice(0, permitidos));
     }
     if (cupo && cupo.restantes === 0) {
-      await cerrarPorLimite(supabase, user.id, tarea, cupo);
+      await cerrarPorLimite(supabase, jardin.id, tarea, cupo);
     }
   }
 
@@ -482,11 +505,13 @@ export async function markAsCured(plant_id: string, product_id?: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Usuario no autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const today = new Date().toISOString().split('T')[0];
 
   // Delete all future PROGRAMADO events for this plant
   let query = supabase.from('events').delete()
-    .eq('user_id', user.id)
+    .eq('user_id', jardin.id)
     .eq('plant_id', plant_id)
     .gt('date', today)
     .like('notes', '%[PROGRAMADO]%');
@@ -499,7 +524,7 @@ export async function markAsCured(plant_id: string, product_id?: string) {
   
   // Add a "Planta Curada" historical record
   await supabase.from('events').insert({
-    user_id: user.id,
+    user_id: jardin.id,
     type: 'Alta Médica',
     date: today,
     notes: 'Tratamiento curativo finalizado manualmente.',
@@ -515,6 +540,8 @@ export async function updateEvent(id: string, formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('Usuario no autenticado');
+
+  const jardin = await jardinDe(supabase, user);
 
   const type = formData.get('type') as string;
   const date = formData.get('date') as string;
@@ -533,7 +560,7 @@ export async function updateEvent(id: string, formData: FormData) {
   const { data: previo } = await supabase
     .from('events')
     .select('notes, date, frequency_days')
-    .match({ id, user_id: user.id })
+    .match({ id, user_id: jardin.id })
     .single();
 
   let notasFinales = notes?.trim() || '';
@@ -550,7 +577,7 @@ export async function updateEvent(id: string, formData: FormData) {
     notes: notasFinales || null,
     plant_id: plant_id || null,
     product_id: product_id || null
-  }).match({ id, user_id: user.id });
+  }).match({ id, user_id: jardin.id });
 
   if (error) {
     console.error("Error al actualizar evento:", error);
@@ -564,7 +591,7 @@ export async function updateEvent(id: string, formData: FormData) {
   const pauta = previo ? leerFrecuencia(previo) : 0;
   if (pauta > 0 && previo?.date && previo.date !== date) {
     let borrar = supabase.from('events').delete()
-      .eq('user_id', user.id)
+      .eq('user_id', jardin.id)
       .eq('type', type)
       .neq('id', id)
       .gt('date', date)
@@ -582,12 +609,12 @@ export async function updateEvent(id: string, formData: FormData) {
     const [aa, mm, dd] = date.split('-').map(Number);
     const siguiente = new Date(aa, mm - 1, dd);
 
-    const cupoEd = await cupoDeAplicaciones(supabase, user.id, { type, plant_id: plant_id || null, product_id: product_id || null });
+    const cupoEd = await cupoDeAplicaciones(supabase, jardin.id, { type, plant_id: plant_id || null, product_id: product_id || null });
     const nuevos = [];
     for (let i = 0; i < (cupoEd ? Math.min(3, cupoEd.restantes) : 3); i++) {
       siguiente.setDate(siguiente.getDate() + pauta);
       nuevos.push({
-        user_id: user.id,
+        user_id: jardin.id,
         type,
         date: enTexto(siguiente),
         notes: `[PROGRAMADO] Tarea programada cada ${pauta} días.`,
@@ -613,7 +640,9 @@ export async function deleteEvent(id: string) {
 
   if (!user) throw new Error('Usuario no autenticado');
 
-  const { error } = await supabase.from('events').delete().match({ id, user_id: user.id });
+  const jardin = await jardinDe(supabase, user);
+
+  const { error } = await supabase.from('events').delete().match({ id, user_id: jardin.id });
   
   if (error) {
     console.error("Error al eliminar evento:", error);
@@ -630,7 +659,9 @@ export async function deleteAllEvents() {
 
   if (!user) throw new Error('Usuario no autenticado');
 
-  const { error } = await supabase.from('events').delete().eq('user_id', user.id);
+  const jardin = await jardinDe(supabase, user);
+
+  const { error } = await supabase.from('events').delete().eq('user_id', jardin.id);
   
   if (error) {
     console.error("Error al limpiar eventos:", error);
@@ -645,6 +676,8 @@ export async function postponeEvent(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) throw new Error('Usuario no autenticado');
+
+  const jardin = await jardinDe(supabase, user);
 
   // Recuperamos el evento completo para saber qué se ha pospuesto
   const { data: event, error: fetchError } = await supabase
@@ -681,7 +714,7 @@ export async function postponeEvent(id: string) {
   const { error } = await supabase
     .from('events')
     .update({ date: tomorrowStr, notes: newNotes })
-    .match({ id, user_id: user.id });
+    .match({ id, user_id: jardin.id });
 
   if (error) {
     console.error("Error al posponer evento:", error);
@@ -693,7 +726,7 @@ export async function postponeEvent(id: string) {
   const plantName = (event.plants as any)?.name || 'General';
   const alertText = `🕒 *Pospuesto a mañana:*\nSe ha aplazado la tarea de ${productName} en ${plantName}.`;
   
-  const { data: contacts } = await supabase.from('notification_contacts').select('phone_number, api_key').eq('user_id', user.id);
+  const { data: contacts } = await supabase.from('notification_contacts').select('phone_number, api_key').eq('user_id', jardin.id);
   
   if (contacts && contacts.length > 0) {
     for (const contact of contacts) {
@@ -718,6 +751,8 @@ export async function completeEvent(id: string) {
 
   if (!user) throw new Error('Usuario no autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { data: event } = await supabase.from('events').select('*').eq('id', id).single();
   
   if (event) {
@@ -737,13 +772,13 @@ export async function completeEvent(id: string) {
     await supabase
       .from('events')
       .update({ notes: newNotes, date: todayStr })
-      .match({ id, user_id: user.id });
+      .match({ id, user_id: jardin.id });
       
     // Si la tarea tenía una frecuencia, debemos re-programar los próximos eventos a partir de HOY
     if (frequency_days > 0) {
       // 1. Borrar los eventos futuros programados para esta misma tarea
       let deleteQuery = supabase.from('events').delete()
-        .eq('user_id', user.id)
+        .eq('user_id', jardin.id)
         .eq('type', event.type)
         .like('notes', '%[PROGRAMADO]%');
         
@@ -762,17 +797,17 @@ export async function completeEvent(id: string) {
       // Cuántas quedan antes del límite del producto. Se cuenta DESPUÉS de
       // haber marcado ésta como hecha, así que ya va incluida.
       const tarea = { type: event.type, plant_id: event.plant_id || null, product_id: event.product_id || null };
-      const cupo = await cupoDeAplicaciones(supabase, user.id, tarea);
+      const cupo = await cupoDeAplicaciones(supabase, jardin.id, tarea);
       const aProgramar = cupo ? Math.min(3, cupo.restantes) : 3;
 
       if (cupo && cupo.restantes === 0) {
-        await cerrarPorLimite(supabase, user.id, tarea, cupo);
+        await cerrarPorLimite(supabase, jardin.id, tarea, cupo);
       }
 
       const futureEventsToInsert = [];
       for (let i = 0; i < aProgramar; i++) {
         futureEventsToInsert.push({
-          user_id: user.id,
+          user_id: jardin.id,
           type: event.type,
           date: getLocalDateString(nextDate),
           notes: `[PROGRAMADO] Tarea programada cada ${frequency_days} días.`,
@@ -821,6 +856,8 @@ export async function addProductFromScan(identificado: {
 
   if (!user) return { error: 'Usuario no autenticado' };
 
+  const jardin = await jardinDe(supabase, user);
+
   const { name, type } = identificado;
   if (!name || !type) return { error: 'La identificación llegó incompleta' };
 
@@ -832,7 +869,7 @@ export async function addProductFromScan(identificado: {
   const { data, error } = await supabase
     .from('products')
     .insert({
-      user_id: user.id,
+      user_id: jardin.id,
       name,
       type,
       description: identificado.description || null,
@@ -1086,6 +1123,8 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
 
   if (!user) return { error: 'Usuario no autenticado' };
 
+  const jardin = await jardinDe(supabase, user);
+
   const { data: events, error } = await supabase
     .from('events')
     .select('id, type, date, notes, frequency_days, plant_id, product_id, products(name, type, description, frequency_days), plants(name, species)')
@@ -1132,7 +1171,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
       continue;
     }
 
-    if (await reprogramarTarea(supabase, user.id, muestra, grupo.map((g: any) => g.id), events, ahora, metodo, pauta.hasta ?? hastaDeLasNotas(muestra.notes))) {
+    if (await reprogramarTarea(supabase, jardin.id, muestra, grupo.map((g: any) => g.id), events, ahora, metodo, pauta.hasta ?? hastaDeLasNotas(muestra.notes))) {
       cambios.push({ tarea, antes, ahora, motivo: pauta.motivo, hasta: pauta.hasta });
     }
   }
@@ -1178,10 +1217,10 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
       await supabase
         .from('products')
         .update({ frequency_days: dias, frequency_source: 'ia' })
-        .match({ id: ultimo.product_id, user_id: user.id });
+        .match({ id: ultimo.product_id, user_id: jardin.id });
     }
 
-    if (await reprogramarTarea(supabase, user.id, ultimo, [], events, dias, metodo, pauta?.hasta ?? null)) {
+    if (await reprogramarTarea(supabase, jardin.id, ultimo, [], events, dias, metodo, pauta?.hasta ?? null)) {
       reactivadas.push({
         tarea: `${producto.name}${planta?.name ? ` en ${planta.name}` : ''}`,
         dias,
@@ -1220,15 +1259,17 @@ export async function terminarTratamiento(eventId: string) {
 
   if (!user) throw new Error('Usuario no autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { data: evento } = await supabase
     .from('events')
     .select('type, plant_id, product_id')
-    .match({ id: eventId, user_id: user.id })
+    .match({ id: eventId, user_id: jardin.id })
     .single();
   if (!evento) return;
 
   let borrado = supabase.from('events').delete()
-    .eq('user_id', user.id)
+    .eq('user_id', jardin.id)
     .eq('type', evento.type)
     .like('notes', '%[PROGRAMADO]%')
     .not('notes', 'like', '%[HECHO]%');
@@ -1241,7 +1282,7 @@ export async function terminarTratamiento(eventId: string) {
   let consulta = supabase
     .from('events')
     .select('id, notes')
-    .eq('user_id', user.id)
+    .eq('user_id', jardin.id)
     .eq('type', evento.type)
     .or('notes.is.null,notes.not.like.*[PROGRAMADO]*')
     .order('date', { ascending: false })
@@ -1254,7 +1295,7 @@ export async function terminarTratamiento(eventId: string) {
     await supabase
       .from('events')
       .update({ notes: `${ultima.notes || ''} [FIN]`.trim() })
-      .match({ id: ultima.id, user_id: user.id });
+      .match({ id: ultima.id, user_id: jardin.id });
   }
 
   revalidatePath('/');
@@ -1281,6 +1322,8 @@ export async function guardarRecorrido(detecciones: {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { creadas: [], actualizadas: [], errores: ['Usuario no autenticado'] };
+
+  const jardin = await jardinDe(supabase, user);
 
   const creadas: string[] = [];
   const actualizadas: string[] = [];
@@ -1314,7 +1357,7 @@ export async function guardarRecorrido(detecciones: {
         const { data: existente } = await supabase
           .from('plants')
           .select('id, name, image_url, lat, lng, path')
-          .match({ id: d.plantaExistenteId, user_id: user.id })
+          .match({ id: d.plantaExistenteId, user_id: jardin.id })
           .single();
         if (!existente) {
           errores.push(`${nombre}: la planta registrada a la que apuntaba ya no existe.`);
@@ -1332,12 +1375,12 @@ export async function guardarRecorrido(detecciones: {
           cambios.lng = d.lng;
         }
         if (Object.keys(cambios).length > 0) {
-          await supabase.from('plants').update(cambios).match({ id: existente.id, user_id: user.id });
+          await supabase.from('plants').update(cambios).match({ id: existente.id, user_id: jardin.id });
         }
         if (urlFoto) {
           // Si la tabla del historial aún no existe, este insert falla sin más.
           await supabase.from('plant_photos').insert({
-            user_id: user.id,
+            user_id: jardin.id,
             plant_id: existente.id,
             url: urlFoto,
             note: d.descripcion?.slice(0, 400) || 'Captura del recorrido',
@@ -1348,7 +1391,7 @@ export async function guardarRecorrido(detecciones: {
         const image_url = d.foto ? await subirFoto(d.foto) : null;
         const icon_category = await resolverCategoria(d.especie, nombre);
         const { data: creada, error } = await supabase.from('plants').insert({
-          user_id: user.id,
+          user_id: jardin.id,
           name: nombre,
           species: d.especie?.trim() || null,
           description: d.descripcion?.trim() || null,
@@ -1365,7 +1408,7 @@ export async function guardarRecorrido(detecciones: {
           if (image_url && creada?.id) {
             // Primera entrada del historial de evolución (si la tabla existe).
             await supabase.from('plant_photos').insert({
-              user_id: user.id,
+              user_id: jardin.id,
               plant_id: creada.id,
               url: image_url,
               note: d.descripcion?.slice(0, 400) || 'Captura del recorrido',
@@ -1395,8 +1438,10 @@ export async function prepararPlanAnual(indicaciones: string): Promise<{ propues
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: 'Usuario no autenticado' };
 
-  const { data: plants } = await supabase.from('plants').select('name, species, lat, lng').eq('user_id', user.id);
-  const { data: products } = await supabase.from('products').select('name, type, description').eq('user_id', user.id);
+  const jardin = await jardinDe(supabase, user);
+
+  const { data: plants } = await supabase.from('plants').select('name, species, lat, lng').eq('user_id', jardin.id);
+  const { data: products } = await supabase.from('products').select('name, type, description').eq('user_id', jardin.id);
   const { data: events } = await supabase.from('events')
     .select('type, date, notes, products(name), plants(name)')
     .order('date', { ascending: false })
@@ -1411,7 +1456,7 @@ export async function prepararPlanAnual(indicaciones: string): Promise<{ propues
   const reales = (events || []).filter((e: any) => !e.notes?.includes('[PROGRAMADO]')).slice(0, 40);
   const programados = (events || []).filter((e: any) => e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')).slice(0, 30);
 
-  const { data: parcelas } = await supabase.from('parcels').select('geojson').eq('user_id', user.id).limit(1);
+  const { data: parcelas } = await supabase.from('parcels').select('geojson').eq('user_id', jardin.id).limit(1);
   const conPos: any = (plants || []).find((p: any) => p.lat != null && p.lng != null);
   const coordenadas = centroDeGeojson(parcelas?.[0]?.geojson)
     || (conPos ? { lat: conPos.lat, lng: conPos.lng } : null);
@@ -1443,8 +1488,10 @@ export async function aplicarPlanAnual(seleccion: PropuestaPlan[]): Promise<{ cr
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { creadas: 0, error: 'Usuario no autenticado' };
 
-  const { data: plants } = await supabase.from('plants').select('id, name').eq('user_id', user.id);
-  const { data: products } = await supabase.from('products').select('id, name').eq('user_id', user.id);
+  const jardin = await jardinDe(supabase, user);
+
+  const { data: plants } = await supabase.from('plants').select('id, name').eq('user_id', jardin.id);
+  const { data: products } = await supabase.from('products').select('id, name').eq('user_id', jardin.id);
   const limpia = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
   let creadas = 0;
@@ -1454,7 +1501,7 @@ export async function aplicarPlanAnual(seleccion: PropuestaPlan[]): Promise<{ cr
     const product_id = p.producto ? (products || []).find(x => limpia(x.name) === limpia(p.producto!))?.id ?? null : null;
     const texto = `${p.titulo}. ${p.motivo}`.replace(/[\[\]]/g, '').slice(0, 380);
     const { error } = await supabase.from('events').insert({
-      user_id: user.id,
+      user_id: jardin.id,
       type: p.tipo,
       date: p.fecha,
       notes: `[PROGRAMADO] Plan anual: ${texto}${p.hasta ? ` Revisar hasta: ${p.hasta.replace(/[\[\]]/g, '').slice(0, 120)}.` : ''}`,
@@ -1502,12 +1549,14 @@ export async function consultarAsistente(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ...vacio, error: 'Usuario no autenticado' };
 
+  const jardin = await jardinDe(supabase, user);
+
   const peticion = texto?.trim().slice(0, 600);
   if (!peticion) return { ...vacio, error: 'Cuéntame algo primero.' };
 
   const [{ data: plants }, { data: products }, { data: events }] = await Promise.all([
-    supabase.from('plants').select('id, name, species, description').eq('user_id', user.id),
-    supabase.from('products').select('id, name, type, description').eq('user_id', user.id),
+    supabase.from('plants').select('id, name, species, description').eq('user_id', jardin.id),
+    supabase.from('products').select('id, name, type, description').eq('user_id', jardin.id),
     supabase.from('events').select('type, date, notes, plants(name), products(name)').order('date', { ascending: false }).limit(25),
   ]);
 
@@ -1541,7 +1590,7 @@ export async function consultarAsistente(
     const nota = ev.nota.replace(/[\[\]]/g, '').trim().slice(0, 380);
     const esFuturo = ev.fecha > hoy;
     const { error } = await supabase.from('events').insert({
-      user_id: user.id,
+      user_id: jardin.id,
       type: ev.tipo,
       date: ev.fecha,
       notes: esFuturo ? `[PROGRAMADO] ${nota}` : nota,
@@ -1563,7 +1612,7 @@ export async function consultarAsistente(
     const tipo = pr.tipo?.trim().slice(0, 60) || 'Otro';
     const pauta = await deducirFrecuencia(nombre, tipo, pr.descripcion || '');
     const { data: creado } = await supabase.from('products').insert({
-      user_id: user.id,
+      user_id: jardin.id,
       name: nombre,
       type: tipo,
       description: pr.descripcion?.slice(0, 400) || null,
@@ -1581,7 +1630,7 @@ export async function consultarAsistente(
     if (!nombre) continue;
     if ((plants || []).some(x => limpia(x.name) === limpia(nombre))) continue;
     const { data: creada } = await supabase.from('plants').insert({
-      user_id: user.id,
+      user_id: jardin.id,
       name: nombre,
       species: pl.especie?.slice(0, 120) || null,
       icon_category: categoriaDeEspecie(pl.especie || null, nombre),
@@ -1622,13 +1671,13 @@ ${texto}` : texto;
 
     let { error } = await supabase.from(tabla)
       .update(cambios)
-      .match({ id: ficha.id, user_id: user.id });
+      .match({ id: ficha.id, user_id: jardin.id });
 
     // Si la migración 009 aún no está aplicada, al menos que la nota se guarde.
     if (error && tope) {
       ({ error } = await supabase.from(tabla)
         .update({ description: descripcion.slice(0, 1500) })
-        .match({ id: ficha.id, user_id: user.id }));
+        .match({ id: ficha.id, user_id: jardin.id }));
     }
 
     if (!error) {
@@ -1668,10 +1717,12 @@ export async function reabrirEvento(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Usuario no autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { data: evento } = await supabase
     .from('events')
     .select('notes')
-    .match({ id, user_id: user.id })
+    .match({ id, user_id: jardin.id })
     .single();
 
   let notas = (evento?.notes || '').replace(/\[(HECHO|FIN)\]/g, '').trim();
@@ -1679,7 +1730,7 @@ export async function reabrirEvento(id: string) {
     notas = notas ? `[PROGRAMADO] ${notas}` : '[PROGRAMADO]';
   }
 
-  await supabase.from('events').update({ notes: notas }).match({ id, user_id: user.id });
+  await supabase.from('events').update({ notes: notas }).match({ id, user_id: jardin.id });
 
   revalidatePath('/');
   revalidatePath('/calendar');
@@ -1695,10 +1746,12 @@ export async function pasarAHoy(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Usuario no autenticado');
 
+  const jardin = await jardinDe(supabase, user);
+
   const { data: evento } = await supabase
     .from('events')
     .select('notes')
-    .match({ id, user_id: user.id })
+    .match({ id, user_id: jardin.id })
     .single();
 
   // Sigue pendiente, y deja de estar pospuesto: la intención es la contraria.
@@ -1710,8 +1763,114 @@ export async function pasarAHoy(id: string) {
   const d = new Date();
   const hoy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-  await supabase.from('events').update({ date: hoy, notes: notas }).match({ id, user_id: user.id });
+  await supabase.from('events').update({ date: hoy, notes: notas }).match({ id, user_id: jardin.id });
 
   revalidatePath('/');
   revalidatePath('/calendar');
+}
+
+/**
+ * Quién cuida este jardín. El creador no tiene fila propia en la tabla: se
+ * añade aquí para que la lista se lea como lo que es, la gente de la casa.
+ */
+export async function miembrosDelJardin() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const jardin = await jardinDe(supabase, user);
+
+  const { data, error } = await supabase
+    .from('garden_members')
+    .select('id, email, member_id, rol, created_at, owner_email')
+    .eq('owner_id', jardin.id)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { error: 'Comparte el jardín ejecutando antes la migración 010.' };
+  }
+
+  const dueno = jardin.esDueno ? (user.email || 'Tú') : (data?.[0]?.owner_email || 'el creador');
+
+  return {
+    jardin: { esDueno: jardin.esDueno, esAdmin: jardin.esAdmin, rol: jardin.rol, dueno },
+    miembros: (data || []).map(m => ({
+      id: m.id as string,
+      email: m.email as string,
+      rol: (m.rol as string) === 'admin' ? 'admin' : 'colaborador',
+      aceptada: Boolean(m.member_id),
+      soyYo: m.member_id === user.id,
+    })),
+  };
+}
+
+/**
+ * Invita a alguien a cuidar este jardín. Basta el correo: la invitación queda
+ * esperando y se activa sola cuando esa persona entra, se registre antes o
+ * después.
+ */
+export async function invitarAlJardin(email: string, rol: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const jardin = await jardinDe(supabase, user);
+  if (!jardin.esAdmin) return { error: 'Solo el creador y los administradores pueden invitar.' };
+
+  const correo = (email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(correo)) return { error: 'Ese correo no parece válido.' };
+  if (correo === (user.email || '').toLowerCase()) return { error: 'Ese eres tú.' };
+
+  // Nombrar administradores es cosa del creador; un admin invita colaboradores.
+  const rolFinal = rol === 'admin' && jardin.esDueno ? 'admin' : 'colaborador';
+
+  const { error } = await supabase.from('garden_members').insert({
+    owner_id: jardin.id,
+    owner_email: jardin.esDueno ? user.email : null,
+    email: correo,
+    rol: rolFinal,
+  });
+
+  if (error) {
+    if (error.code === '23505') return { error: 'Esa persona ya está invitada.' };
+    return { error: 'No se pudo invitar. ¿Está aplicada la migración 010?' };
+  }
+
+  revalidatePath('/settings');
+  return { ok: `${correo} ya puede entrar con su cuenta y verá este mismo jardín.` };
+}
+
+/** Cambia el rol de un miembro. Solo el creador reparte administraciones. */
+export async function cambiarRolDelMiembro(id: string, rol: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const jardin = await jardinDe(supabase, user);
+  if (!jardin.esDueno) return { error: 'Solo el creador del jardín puede cambiar roles.' };
+
+  const { error } = await supabase
+    .from('garden_members')
+    .update({ rol: rol === 'admin' ? 'admin' : 'colaborador' })
+    .match({ id, owner_id: jardin.id });
+
+  if (error) return { error: 'No se pudo cambiar el rol.' };
+  revalidatePath('/settings');
+  return { ok: 'Rol actualizado.' };
+}
+
+/** Saca a alguien del jardín. Sus registros se quedan: son del jardín, no suyos. */
+export async function quitarDelJardin(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Usuario no autenticado' };
+
+  const jardin = await jardinDe(supabase, user);
+  if (!jardin.esAdmin) return { error: 'Solo el creador y los administradores pueden hacer esto.' };
+
+  const { error } = await supabase.from('garden_members').delete().match({ id, owner_id: jardin.id });
+  if (error) return { error: 'No se pudo quitar a esa persona.' };
+
+  revalidatePath('/settings');
+  return { ok: 'Ya no tiene acceso al jardín.' };
 }

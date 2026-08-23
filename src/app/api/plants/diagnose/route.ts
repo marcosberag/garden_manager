@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { diagnosticarPlanta } from '@/lib/diagnosticar-planta';
 import { compararFotosPlanta } from '@/lib/comparar-fotos';
+import { jardinDe } from '@/lib/jardin';
 
 const normaliza = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
@@ -13,6 +14,8 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
   }
+
+  const jardin = await jardinDe(supabase, user);
 
   const formData = await req.formData();
   const image = formData.get('image') as File | null;
@@ -26,7 +29,7 @@ export async function POST(req: Request) {
   const { data: plant } = await supabase
     .from('plants')
     .select('name, species, description, image_url')
-    .match({ id: plantId, user_id: user.id })
+    .match({ id: plantId, user_id: jardin.id })
     .single();
   if (!plant) {
     return NextResponse.json({ error: 'Planta no encontrada' }, { status: 404 });
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
   const { data: products } = await supabase
     .from('products')
     .select('id, name, type, description')
-    .eq('user_id', user.id);
+    .eq('user_id', jardin.id);
 
   const buffer = Buffer.from(await image.arrayBuffer());
   const base64 = buffer.toString('base64');
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
     const { data: previas } = await supabase
       .from('plant_photos')
       .select('url, note, created_at')
-      .match({ plant_id: plantId, user_id: user.id })
+      .match({ plant_id: plantId, user_id: jardin.id })
       .order('created_at', { ascending: false })
       .limit(1);
     const previa = previas?.[0]
@@ -99,7 +102,7 @@ export async function POST(req: Request) {
     if (!errorSubida) {
       const url = supabase.storage.from('plant_images').getPublicUrl(filePath).data.publicUrl;
       await supabase.from('plant_photos').insert({
-        user_id: user.id,
+        user_id: jardin.id,
         plant_id: plantId,
         url,
         note: `${diagnostico.diagnostico}. ${diagnostico.descripcion}`.slice(0, 400),

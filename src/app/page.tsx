@@ -8,6 +8,7 @@ import Asistente from '@/components/Asistente';
 import { resolverCategoria } from '@/lib/plant-icons-ai';
 import { categoriaDeEspecie } from '@/lib/plant-icons';
 import { fotoDeEspecie } from '@/lib/foto-especie';
+import { jardinDe } from '@/lib/jardin';
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -23,11 +24,13 @@ export default async function HomePage() {
     );
   }
 
+  const jardin = await jardinDe(supabase, user);
+
   // Obtenemos todos los datos de las plantas para mostrarlos en el popup
   const { data: plants } = await supabase
     .from('plants')
     .select('*')
-    .eq('user_id', user.id);
+    .eq('user_id', jardin.id);
 
   // Relleno perezoso de categorías: las plantas de antes del sistema de iconos
   // no tienen categoría (y alguna quedó guardada como "generica" por un fallo
@@ -41,7 +44,7 @@ export default async function HomePage() {
         : await resolverCategoria(p.species, p.name);
       if (nueva && nueva !== p.icon_category) {
         p.icon_category = nueva;
-        await supabase.from('plants').update({ icon_category: nueva }).match({ id: p.id, user_id: user.id });
+        await supabase.from('plants').update({ icon_category: nueva }).match({ id: p.id, user_id: jardin.id });
       }
     }));
   }
@@ -56,7 +59,7 @@ export default async function HomePage() {
   const { data: parcel } = await supabase
     .from('parcels')
     .select('geojson')
-    .eq('user_id', user.id)
+    .eq('user_id', jardin.id)
     .single();
 
   return (

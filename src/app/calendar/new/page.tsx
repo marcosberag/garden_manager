@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import NewEventForm from './NewEventForm';
+import { jardinDe } from '@/lib/jardin';
 
 export default async function NewEventPage({ searchParams }: {
   searchParams: Promise<{ plant_id?: string; product_id?: string; method?: string; notes?: string }>
@@ -14,6 +15,8 @@ export default async function NewEventPage({ searchParams }: {
     redirect('/login');
   }
 
+  const jardin = await jardinDe(supabase, user);
+
   // Valores iniciales por URL: la ficha de planta y el diagnóstico por foto
   // encadenan aquí con planta, producto, modo y notas ya puestos.
   const sp = await searchParams;
@@ -22,8 +25,8 @@ export default async function NewEventPage({ searchParams }: {
   // Fetch plants and products for the dropdowns. El path y el tamaño de la
   // planta permiten calcular la dosis con los metros reales del mapa; la
   // descripción y la dosis del producto afinan pauta y caldo.
-  const { data: plants } = await supabase.from('plants').select('id, name, species, path, size').eq('user_id', user.id);
-  const { data: products } = await supabase.from('products').select('id, name, type, description, dosage, frequency_days').eq('user_id', user.id);
+  const { data: plants } = await supabase.from('plants').select('id, name, species, path, size').eq('user_id', jardin.id);
+  const { data: products } = await supabase.from('products').select('id, name, type, description, dosage, frequency_days').eq('user_id', jardin.id);
 
   const today = new Date().toISOString().split('T')[0];
 

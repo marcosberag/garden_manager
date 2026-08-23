@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { jardinDe } from '@/lib/jardin';
 
 export async function addContact(formData: FormData) {
   const supabase = await createClient()
@@ -9,13 +10,15 @@ export async function addContact(formData: FormData) {
 
   if (!user) return { error: 'No autorizado' }
 
+  const jardin = await jardinDe(supabase, user)
+
   const name = formData.get('name') as string
   const phone = formData.get('phone') as string
   const apikey = formData.get('apikey') as string
 
   const { error } = await supabase
     .from('notification_contacts')
-    .insert([{ user_id: user.id, name, phone_number: phone, api_key: apikey }])
+    .insert([{ user_id: jardin.id, name, phone_number: phone, api_key: apikey }])
 
   if (!error) {
     revalidatePath('/settings')

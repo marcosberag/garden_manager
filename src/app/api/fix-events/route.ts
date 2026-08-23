@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 import { leerFrecuencia } from '@/lib/frecuencias';
+import { jardinDe } from '@/lib/jardin';
 
 export async function GET() {
   const supabase = await createClient();
@@ -8,8 +9,10 @@ export async function GET() {
   
   if (!user) return NextResponse.json({ error: 'Debes iniciar sesión para arreglar los eventos' });
 
+  const jardin = await jardinDe(supabase, user);
+
   // 1. Get all events for the user
-  const { data: events, error: fetchError } = await supabase.from('events').select('*').eq('user_id', user.id);
+  const { data: events, error: fetchError } = await supabase.from('events').select('*').eq('user_id', jardin.id);
   if (fetchError) return NextResponse.json({ error: fetchError.message });
   
   const programmed = events.filter(e => e.notes && e.notes.includes('[PROGRAMADO]'));
@@ -67,7 +70,7 @@ export async function GET() {
       const futureEventsToInsert = [];
       for (let i = 0; i < 3; i++) {
         futureEventsToInsert.push({
-          user_id: user.id,
+          user_id: jardin.id,
           type: root.type,
           date: getLocalDateString(nextDate),
           notes: freqData.notes,

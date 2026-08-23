@@ -2,6 +2,7 @@ import React from 'react';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import RecorridoClient from './RecorridoClient';
+import { jardinDe } from '@/lib/jardin';
 
 // El recorrido con cámara: paseas por el jardín enfocando las plantas y la app
 // las va identificando y colocando en la parcela.
@@ -13,16 +14,18 @@ export default async function RecorridoPage() {
     redirect('/login');
   }
 
+  const jardin = await jardinDe(supabase, user);
+
   const { data: plants } = await supabase
     .from('plants')
     .select('id, name, species, lat, lng, path, image_url')
-    .eq('user_id', user.id)
+    .eq('user_id', jardin.id)
     .order('name');
 
   const { data: parcel } = await supabase
     .from('parcels')
     .select('geojson')
-    .eq('user_id', user.id)
+    .eq('user_id', jardin.id)
     .single();
 
   return (

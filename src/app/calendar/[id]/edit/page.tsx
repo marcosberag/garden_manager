@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import { updateEvent, deleteEvent } from '@/app/actions';
 import DeleteEventButton from './DeleteEventButton';
+import { jardinDe } from '@/lib/jardin';
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -14,16 +15,18 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
     redirect('/login');
   }
 
+  const jardin = await jardinDe(supabase, user);
+
   // Fetch the event
-  const { data: event } = await supabase.from('events').select('*').eq('id', id).eq('user_id', user.id).single();
+  const { data: event } = await supabase.from('events').select('*').eq('id', id).eq('user_id', jardin.id).single();
   
   if (!event) {
     redirect('/');
   }
 
   // Fetch plants and products for the dropdowns
-  const { data: plants } = await supabase.from('plants').select('id, name, species').eq('user_id', user.id);
-  const { data: products } = await supabase.from('products').select('id, name, type').eq('user_id', user.id);
+  const { data: plants } = await supabase.from('plants').select('id, name, species').eq('user_id', jardin.id);
+  const { data: products } = await supabase.from('products').select('id, name, type').eq('user_id', jardin.id);
 
   const updateEventWithId = updateEvent.bind(null, id);
   const deleteEventWithId = deleteEvent.bind(null, id);
