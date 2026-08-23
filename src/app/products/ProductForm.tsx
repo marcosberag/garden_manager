@@ -172,7 +172,8 @@ export default function ProductForm({ action, defaults, textoBoton }: {
         </div>
         <p className="field-hint">
           Muchos sistémicos traen un tope en la etiqueta. Si lo pones, la app deja de
-          programar avisos al alcanzarlo, en vez de seguir recordándotelo para siempre.
+          programar avisos al alcanzarlo. Cuenta solo la tanda en curso: si dejas de
+          tratar una temporada larga, la cuenta vuelve a empezar.
         </p>
       </div>
 

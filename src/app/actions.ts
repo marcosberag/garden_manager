@@ -9,6 +9,7 @@ import { categoriaDeEspecie } from '@/lib/plant-icons';
 import { centroDeGeojson } from '@/lib/meteo';
 import { generarPlanAnual, type PropuestaPlan } from '@/lib/plan-anual';
 import { interpretarPeticion, type EnlaceAsistente } from '@/lib/asistente';
+import { aplicacionesDeLaTanda, cortePorInactividad } from '@/lib/tandas';
 
 /**
  * Tope de aplicaciones que venga del formulario de producto. Vacío o fuera de
@@ -863,6 +864,11 @@ export type CupoAplicaciones = { limite: number; periodo: string; hechas: number
  * Cuántas aplicaciones más admite un tratamiento antes de tocar el límite
  * anotado en su producto. Devuelve null si no hay límite — o si la migración
  * 009 aún no está aplicada, para que nada se rompa mientras tanto.
+ *
+ * Cuenta solo la TANDA en curso, no el historial entero: un tope de «3 en
+ * total» significa tres aplicaciones seguidas de tratamiento, no tres en la
+ * vida del jardín. Si hace más de un corte que no se trata, la cuenta arranca
+ * de cero, porque eso ya es una tanda nueva.
  */
 async function cupoDeAplicaciones(
   supabase: any,
@@ -874,7 +880,7 @@ async function cupoDeAplicaciones(
   try {
     const { data: producto, error } = await supabase
       .from('products')
-      .select('max_aplicaciones, limite_periodo')
+      .select('max_aplicaciones, limite_periodo, frequency_days')
       .match({ id: tarea.product_id, user_id: userId })
       .maybeSingle();
 
@@ -884,26 +890,28 @@ async function cupoDeAplicaciones(
     if (!limite || limite < 1) return null;
 
     const periodo = producto.limite_periodo === 'total' ? 'total' : 'anual';
+    const corte = cortePorInactividad(Number(producto.frequency_days) || 0);
 
     let consulta = supabase
       .from('events')
-      .select('notes')
+      .select('date, notes')
       .eq('user_id', userId)
       .eq('type', tarea.type)
-      .eq('product_id', tarea.product_id);
+      .eq('product_id', tarea.product_id)
+      .order('date', { ascending: false })
+      .limit(60);
     consulta = tarea.plant_id ? consulta.eq('plant_id', tarea.plant_id) : consulta.is('plant_id', null);
 
-    if (periodo === 'anual') {
-      const desde = new Date();
-      desde.setFullYear(desde.getFullYear() - 1);
-      consulta = consulta.gte('date', `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, '0')}-${String(desde.getDate()).padStart(2, '0')}`);
-    }
-
     const { data: todos } = await consulta;
+
     // Aplicación real es la que ya no es un aviso pendiente: o se registró a
     // mano, o se marcó como hecha.
-    const hechas = (todos || []).filter((e: any) => !e.notes?.includes('[PROGRAMADO]')).length;
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+    const reales = (todos || [])
+      .filter((e: any) => !e.notes?.includes('[PROGRAMADO]') && e.date <= hoy)
+      .map((e: any) => e.date as string);
 
+    const hechas = aplicacionesDeLaTanda(reales, hoy, corte, periodo);
     return { limite, periodo, hechas, restantes: Math.max(0, limite - hechas) };
   } catch {
     return null;
@@ -931,7 +939,7 @@ async function cerrarPorLimite(supabase: any, userId: string, tarea: ClaveTarea,
   if (!ultima || ultima.notes?.includes('[FIN]')) return;
 
   const cierre = cupo.periodo === 'total'
-    ? `Límite alcanzado: ${cupo.limite} aplicaciones en total.`
+    ? `Límite alcanzado: ${cupo.limite} aplicaciones en esta tanda.`
     : `Límite alcanzado: ${cupo.limite} aplicaciones en un año.`;
 
   await supabase
