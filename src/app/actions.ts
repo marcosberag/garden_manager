@@ -10,6 +10,20 @@ import { centroDeGeojson } from '@/lib/meteo';
 import { generarPlanAnual, type PropuestaPlan } from '@/lib/plan-anual';
 import { interpretarPeticion, type EnlaceAsistente } from '@/lib/asistente';
 
+/**
+ * Tope de aplicaciones que venga del formulario de producto. Vacío o fuera de
+ * rango cuenta como "sin límite".
+ */
+function leerLimiteDelFormulario(formData: FormData) {
+  const bruto = (formData.get('max_aplicaciones') as string || '').trim();
+  const n = bruto ? parseInt(bruto, 10) : NaN;
+  if (!Number.isFinite(n) || n < 1 || n > 50) return { max_aplicaciones: null, limite_periodo: null };
+  return {
+    max_aplicaciones: n,
+    limite_periodo: (formData.get('limite_periodo') as string) === 'total' ? 'total' : 'anual',
+  };
+}
+
 export async function addPlant(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -111,6 +125,7 @@ export async function addProduct(formData: FormData) {
     dosage: dosage || null,
     frequency_days,
     frequency_source,
+    ...leerLimiteDelFormulario(formData),
   });
 
   if (error) {
@@ -230,7 +245,7 @@ export async function updateProduct(id: string, formData: FormData) {
 
   await supabase
     .from('products')
-    .update({ name, type, description, barcode: barcode || null, dosage: dosage || null, frequency_days, frequency_source })
+    .update({ name, type, description, barcode: barcode || null, dosage: dosage || null, frequency_days, frequency_source, ...leerLimiteDelFormulario(formData) })
     .match({ id, user_id: user.id });
 
   // Si la pauta cambió, los avisos ya programados con este producto se
@@ -441,9 +456,17 @@ export async function addEvent(formData: FormData) {
     throw new Error('Error al guardar el evento en la base de datos');
   }
 
-  // Insert future events if any
+  // Insert future events if any, sin pasarse del límite del producto
   if (futureEventsToInsert.length > 0) {
-    await supabase.from('events').insert(futureEventsToInsert);
+    const tarea = { type, plant_id: plant_id || null, product_id: product_id || null };
+    const cupo = await cupoDeAplicaciones(supabase, user.id, tarea);
+    const permitidos = cupo ? Math.min(futureEventsToInsert.length, cupo.restantes) : futureEventsToInsert.length;
+    if (permitidos > 0) {
+      await supabase.from('events').insert(futureEventsToInsert.slice(0, permitidos));
+    }
+    if (cupo && cupo.restantes === 0) {
+      await cerrarPorLimite(supabase, user.id, tarea, cupo);
+    }
   }
 
   revalidatePath('/');
@@ -558,8 +581,9 @@ export async function updateEvent(id: string, formData: FormData) {
     const [aa, mm, dd] = date.split('-').map(Number);
     const siguiente = new Date(aa, mm - 1, dd);
 
+    const cupoEd = await cupoDeAplicaciones(supabase, user.id, { type, plant_id: plant_id || null, product_id: product_id || null });
     const nuevos = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (cupoEd ? Math.min(3, cupoEd.restantes) : 3); i++) {
       siguiente.setDate(siguiente.getDate() + pauta);
       nuevos.push({
         user_id: user.id,
@@ -734,8 +758,18 @@ export async function completeEvent(id: string) {
       let nextDate = new Date(todayObj);
       nextDate.setDate(nextDate.getDate() + frequency_days);
       
-      let futureEventsToInsert = [];
-      for (let i = 0; i < 3; i++) {
+      // Cuántas quedan antes del límite del producto. Se cuenta DESPUÉS de
+      // haber marcado ésta como hecha, así que ya va incluida.
+      const tarea = { type: event.type, plant_id: event.plant_id || null, product_id: event.product_id || null };
+      const cupo = await cupoDeAplicaciones(supabase, user.id, tarea);
+      const aProgramar = cupo ? Math.min(3, cupo.restantes) : 3;
+
+      if (cupo && cupo.restantes === 0) {
+        await cerrarPorLimite(supabase, user.id, tarea, cupo);
+      }
+
+      const futureEventsToInsert = [];
+      for (let i = 0; i < aProgramar; i++) {
         futureEventsToInsert.push({
           user_id: user.id,
           type: event.type,
@@ -821,6 +855,91 @@ export async function addProductFromScan(identificado: {
  * Eventos de la misma tarea: la combinación tipo + planta + producto, la misma
  * que usa addEvent para reemplazar avisos programados.
  */
+type ClaveTarea = { type: string; plant_id: string | null; product_id: string | null };
+
+export type CupoAplicaciones = { limite: number; periodo: string; hechas: number; restantes: number };
+
+/**
+ * Cuántas aplicaciones más admite un tratamiento antes de tocar el límite
+ * anotado en su producto. Devuelve null si no hay límite — o si la migración
+ * 009 aún no está aplicada, para que nada se rompa mientras tanto.
+ */
+async function cupoDeAplicaciones(
+  supabase: any,
+  userId: string,
+  tarea: ClaveTarea,
+): Promise<CupoAplicaciones | null> {
+  if (!tarea.product_id) return null;
+
+  try {
+    const { data: producto, error } = await supabase
+      .from('products')
+      .select('max_aplicaciones, limite_periodo')
+      .match({ id: tarea.product_id, user_id: userId })
+      .maybeSingle();
+
+    if (error || !producto) return null;
+
+    const limite = Number(producto.max_aplicaciones);
+    if (!limite || limite < 1) return null;
+
+    const periodo = producto.limite_periodo === 'total' ? 'total' : 'anual';
+
+    let consulta = supabase
+      .from('events')
+      .select('notes')
+      .eq('user_id', userId)
+      .eq('type', tarea.type)
+      .eq('product_id', tarea.product_id);
+    consulta = tarea.plant_id ? consulta.eq('plant_id', tarea.plant_id) : consulta.is('plant_id', null);
+
+    if (periodo === 'anual') {
+      const desde = new Date();
+      desde.setFullYear(desde.getFullYear() - 1);
+      consulta = consulta.gte('date', `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, '0')}-${String(desde.getDate()).padStart(2, '0')}`);
+    }
+
+    const { data: todos } = await consulta;
+    // Aplicación real es la que ya no es un aviso pendiente: o se registró a
+    // mano, o se marcó como hecha.
+    const hechas = (todos || []).filter((e: any) => !e.notes?.includes('[PROGRAMADO]')).length;
+
+    return { limite, periodo, hechas, restantes: Math.max(0, limite - hechas) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cierra un tratamiento que ha agotado su cupo: marca la última aplicación
+ * real con [FIN] y deja dicho por qué. Sin esto el tratamiento se quedaría sin
+ * avisos y sin explicación, que es justo como se pierden las cosas de vista.
+ */
+async function cerrarPorLimite(supabase: any, userId: string, tarea: ClaveTarea, cupo: CupoAplicaciones) {
+  let consulta = supabase
+    .from('events')
+    .select('id, notes')
+    .eq('user_id', userId)
+    .eq('type', tarea.type)
+    .eq('product_id', tarea.product_id)
+    .order('date', { ascending: false })
+    .limit(20);
+  consulta = tarea.plant_id ? consulta.eq('plant_id', tarea.plant_id) : consulta.is('plant_id', null);
+
+  const { data: todos } = await consulta;
+  const ultima = (todos || []).find((e: any) => !e.notes?.includes('[PROGRAMADO]'));
+  if (!ultima || ultima.notes?.includes('[FIN]')) return;
+
+  const cierre = cupo.periodo === 'total'
+    ? `Límite alcanzado: ${cupo.limite} aplicaciones en total.`
+    : `Límite alcanzado: ${cupo.limite} aplicaciones en un año.`;
+
+  await supabase
+    .from('events')
+    .update({ notes: `${ultima.notes || ''} ${cierre} [FIN]`.trim() })
+    .match({ id: ultima.id, user_id: userId });
+}
+
 function claveDeTarea(e: any): string {
   return `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
 }
@@ -887,8 +1006,16 @@ async function reprogramarTarea(
     }
   }
 
+  // El recálculo de pautas tampoco puede pasarse del límite del producto.
+  const claveTarea = { type: tarea.type, plant_id: tarea.plant_id || null, product_id: tarea.product_id || null };
+  const cupoTarea = await cupoDeAplicaciones(supabase, userId, claveTarea);
+  if (cupoTarea && cupoTarea.restantes === 0) {
+    await cerrarPorLimite(supabase, userId, claveTarea, cupoTarea);
+    return false;
+  }
+
   const nuevos = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < (cupoTarea ? Math.min(3, cupoTarea.restantes) : 3); i++) {
     nuevos.push({
       user_id: userId,
       type: tarea.type,
@@ -1474,10 +1601,33 @@ export async function consultarAsistente(
     const descripcion = previa ? `${previa}
 ${texto}` : texto;
 
-    const { error } = await supabase.from(tabla)
-      .update({ description: descripcion.slice(0, 1500) })
+    const cambios: Record<string, unknown> = { description: descripcion.slice(0, 1500) };
+    // Un tope de aplicaciones no se queda en texto: guardado como número, la
+    // app deja de programar avisos al alcanzarlo.
+    const tope = nota.sobre === 'producto' && nota.max_aplicaciones && nota.max_aplicaciones >= 1 && nota.max_aplicaciones <= 50
+      ? Math.round(nota.max_aplicaciones)
+      : null;
+    if (tope) {
+      cambios.max_aplicaciones = tope;
+      cambios.limite_periodo = nota.limite_periodo === 'total' ? 'total' : 'anual';
+    }
+
+    let { error } = await supabase.from(tabla)
+      .update(cambios)
       .match({ id: ficha.id, user_id: user.id });
-    if (!error) hechos.push(`Anotado en ${ficha.name}: ${texto}`);
+
+    // Si la migración 009 aún no está aplicada, al menos que la nota se guarde.
+    if (error && tope) {
+      ({ error } = await supabase.from(tabla)
+        .update({ description: descripcion.slice(0, 1500) })
+        .match({ id: ficha.id, user_id: user.id }));
+    }
+
+    if (!error) {
+      hechos.push(tope
+        ? `Anotado en ${ficha.name}: ${texto} — la app dejará de programar avisos al llegar a ${tope}`
+        : `Anotado en ${ficha.name}: ${texto}`);
+    }
   }
 
   if (hechos.length > 0) {

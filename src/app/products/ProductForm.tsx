@@ -12,6 +12,8 @@ type Defaults = {
   frequency_days?: number | null;
   barcode?: string | null;
   dosage?: string | null;
+  max_aplicaciones?: number | null;
+  limite_periodo?: string | null;
 };
 
 /**
@@ -29,6 +31,8 @@ export default function ProductForm({ action, defaults, textoBoton }: {
   const [descripcion, setDescripcion] = useState(defaults?.description || '');
   const [frecuencia, setFrecuencia] = useState(defaults?.frequency_days ? String(defaults.frequency_days) : '');
   const [dosis, setDosis] = useState(defaults?.dosage || '');
+  const [maxAplicaciones, setMaxAplicaciones] = useState(defaults?.max_aplicaciones ? String(defaults.max_aplicaciones) : '');
+  const [limitePeriodo, setLimitePeriodo] = useState(defaults?.limite_periodo === 'total' ? 'total' : 'anual');
   const [lectura, setLectura] = useState<string | null>(null);
 
   const handleIdentificado = (p: ProductoIdentificado) => {
@@ -136,6 +140,39 @@ export default function ProductForm({ action, defaults, textoBoton }: {
         <p className="field-hint">
           Si la sabes — de la etiqueta o porque te la dijo el vivero — apúntala:
           mandará sobre lo que calcule la IA al preparar el caldo.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <label htmlFor="max_aplicaciones" className="field-label">Máximo de aplicaciones (opcional)</label>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <input
+            type="number"
+            min="1"
+            max="50"
+            id="max_aplicaciones"
+            name="max_aplicaciones"
+            placeholder="Ej: 3"
+            value={maxAplicaciones}
+            onChange={(e) => setMaxAplicaciones(e.target.value)}
+            className="input-field"
+            style={{ flex: '0 0 110px' }}
+          />
+          <select
+            name="limite_periodo"
+            aria-label="Periodo del límite"
+            value={limitePeriodo}
+            onChange={(e) => setLimitePeriodo(e.target.value)}
+            className="input-field"
+            style={{ flex: 1 }}
+          >
+            <option value="anual">al año</option>
+            <option value="total">en total</option>
+          </select>
+        </div>
+        <p className="field-hint">
+          Muchos sistémicos traen un tope en la etiqueta. Si lo pones, la app deja de
+          programar avisos al alcanzarlo, en vez de seguir recordándotelo para siempre.
         </p>
       </div>
 

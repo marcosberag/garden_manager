@@ -26,6 +26,8 @@ export type NotaFicha = {
   sobre: 'producto' | 'planta';
   nombre: string;
   nota: string;
+  max_aplicaciones: number | null;
+  limite_periodo: 'total' | 'anual' | null;
 };
 
 export type EnlaceAsistente = 'inventario' | 'nuevo_producto' | 'nueva_planta' | 'nuevo_tratamiento' | 'recorrido' | 'ajustes';
@@ -80,6 +82,8 @@ export async function interpretarPeticion(texto: string, contexto: ContextoAsist
           sobre: z.enum(['producto', 'planta']),
           nombre: z.string().describe('Nombre EXACTO de un producto del inventario o de una planta del jardín, de las listas de arriba.'),
           nota: z.string().describe('El dato a guardar en su ficha, en una frase corta y en limpio. Ej: "Máximo 3 aplicaciones en total".'),
+          max_aplicaciones: z.number().nullable().describe('Solo si el dato es un tope de aplicaciones de un producto: cuántas como máximo. null en cualquier otro caso.'),
+          limite_periodo: z.enum(['total', 'anual']).nullable().describe('Con max_aplicaciones: "total" si el tope es para siempre («3 veces en total»), "anual" si se reinicia cada año («3 al año», «3 por temporada»). Respeta lo que diga el dueño, no lo reinterpretes. null si no hay tope.'),
         })).describe('Datos que el dueño cuenta sobre algo que YA tiene y conviene guardar en su ficha: límites de uso, dosis que le dijo el vivero, dónde lo compró, cómo reacciona una planta... Vacío si no procede.'),
         enlaces: z.array(z.enum(['inventario', 'nuevo_producto', 'nueva_planta', 'nuevo_tratamiento', 'recorrido', 'ajustes'])).describe('Pantallas que conviene ofrecerle. "inventario" es CONSULTAR lo que ya tiene; "nuevo_producto" es DAR DE ALTA uno que acaba de comprar. Vacío si no hace falta ninguna.'),
       }),
@@ -103,7 +107,7 @@ CÓMO ACTUAR:
 4. Si tiene una planta nueva → dala de alta y ofrece "nueva_planta" para completar la ficha con foto; en la respuesta dile que podrá ubicarla en el mapa.
 5. Si pide consejo o recomendación → contesta tú directamente, concreto y con los datos del jardín (qué producto del inventario usar, cuándo). NO registres nada salvo que lo pida. Si le remites a lo que ya tiene guardado, el enlace es "inventario".
 6. No dupliques: si la agenda ya recoge lo que pide, dilo en la respuesta y no lo vuelvas a crear.
-7. Si te cuenta un dato sobre algo que YA tiene — un límite de uso ("solo 3 aplicaciones en total"), una dosis que le dijo el vivero, una manía de una planta — guárdalo como nota en la ficha de ese producto o esa planta. Es memoria del jardín: se tendrá en cuenta al calcular pautas y al planificar el año. No lo conviertas en un evento de agenda.
+7. Si te cuenta un dato sobre algo que YA tiene — un límite de uso, una dosis que le dijo el vivero, una manía de una planta — guárdalo como nota en la ficha de ese producto o esa planta. Es memoria del jardín: se tendrá en cuenta al calcular pautas y al planificar el año. No lo conviertas en un evento de agenda. Si el dato es un TOPE de aplicaciones de un producto, rellena además max_aplicaciones y limite_periodo: con eso la app deja de programar avisos al llegar al tope, no solo lo advierte. Y no reinterpretes el periodo: «3 veces en total» es total, «3 al año» es anual.
 8. Ante una petición ambigua, haz lo más razonable y di en la respuesta qué has entendido.
 9. Si lo que cuenta no encaja con esa especie, NO le sigas la corriente: apunta igual lo que ha visto, pero avísale en la respuesta. El oídio, por ejemplo, es de plantas de hoja — muy típico en evónimo (Euonymus), rosales, cucurbitáceas y vid — y las coníferas como el ciprés de Leyland no lo padecen: a ellas les afecta el chancro por Seiridium, el amarronamiento por Phytophthora, la seca por Pestalotiopsis o el pulgón del ciprés (Cinara cupressi). Dile qué es lo probable de verdad en esa planta. Esto es para corregir imposibles, no para dudar de lo que ve: si la enfermedad es propia de esa especie, dale la razón sin más.`,
       temperature: 0.4,
