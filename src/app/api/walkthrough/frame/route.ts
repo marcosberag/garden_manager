@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
   const jardin = await jardinDe(supabase, user);
 
-  let body: { imagen?: string; detectadas?: string[] };
+  let body: { imagen?: string };
   try {
     body = await req.json();
   } catch {
@@ -32,7 +32,6 @@ export async function POST(req: Request) {
     .eq('user_id', jardin.id);
 
   const deteccion = await identificarPlantaEnFrame(body.imagen, {
-    detectadasEnRecorrido: (body.detectadas || []).slice(0, 40),
     plantasRegistradas: (plants || []).map(p => ({ nombre: p.name, especie: p.species })),
   });
 

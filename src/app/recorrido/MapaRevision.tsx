@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, GeoJSON, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, GeoJSON, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { pinDePlanta, TAMANO_PIN, ANCLA_PIN } from '@/lib/plant-icons';
@@ -9,6 +9,7 @@ import { pinDePlanta, TAMANO_PIN, ANCLA_PIN } from '@/lib/plant-icons';
 export type MarcadorRevision = {
   key: string;
   nombre: string;
+  numero: number; // el mismo número que la tarjeta de revisión
   lat: number | null;
   lng: number | null;
   categoria: string | null;
@@ -51,6 +52,24 @@ function ColocadorPorToque({ colocando, onMover }: { colocando: string | null; o
     },
   });
   return null;
+}
+
+/**
+ * El pin de la revisión lleva el número de su tarjeta: sin él era imposible
+ * saber qué pin correspondía a qué detección. El seleccionado brilla.
+ */
+function iconoNumerado(categoria: string | null, numero: number, resaltado: boolean): L.DivIcon {
+  const halo = resaltado ? 'filter: drop-shadow(0 0 6px rgba(133,192,147,0.95));' : '';
+  const fondoBadge = resaltado ? '#007010' : '#09352e';
+  return L.divIcon({
+    className: 'custom-plant-icon',
+    html: `<div style="position:relative;width:${TAMANO_PIN[0]}px;height:${TAMANO_PIN[1]}px;${halo}">
+      ${pinDePlanta(categoria)}
+      <span style="position:absolute;top:-7px;right:-9px;background:${fondoBadge};color:#fff;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;font-weight:600;line-height:1;padding:3px 6.5px;border-radius:9999px;border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);">${numero}</span>
+    </div>`,
+    iconSize: TAMANO_PIN,
+    iconAnchor: ANCLA_PIN,
+  });
 }
 
 export default function MapaRevision({ parcel, marcadores, colocando, onMover }: Props) {
@@ -97,22 +116,21 @@ export default function MapaRevision({ parcel, marcadores, colocando, onMover }:
 
         {marcadores.filter(m => m.lat != null && m.lng != null).map(m => (
           <Marker
-            key={m.key}
+            key={`${m.key}-${m.numero}-${colocando === m.key}`}
             position={[m.lat!, m.lng!]}
             draggable
-            icon={L.divIcon({
-              className: 'custom-plant-icon',
-              html: pinDePlanta(m.categoria),
-              iconSize: TAMANO_PIN,
-              iconAnchor: ANCLA_PIN,
-            })}
+            icon={iconoNumerado(m.categoria, m.numero, colocando === m.key)}
             eventHandlers={{
               dragend: (e) => {
                 const pos = (e.target as L.Marker).getLatLng();
                 onMover(m.key, pos.lat, pos.lng);
               },
             }}
-          />
+          >
+            <Tooltip direction="top" offset={[0, -TAMANO_PIN[1]]}>
+              {m.numero}. {m.nombre}
+            </Tooltip>
+          </Marker>
         ))}
       </MapContainer>
     </div>
