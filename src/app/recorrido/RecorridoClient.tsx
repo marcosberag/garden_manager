@@ -236,18 +236,20 @@ export default function RecorridoClient({ plantas, parcel, deteccionesIniciales,
   // --- Captura inteligente ---------------------------------------------------
   // Cada segundo se toma una miniatura barata del encuadre y se compara con la
   // anterior (¿está quieta la cámara?) y con la última analizada (¿es escena
-  // nueva?). El pulso a mano tiembla más de lo que parecía: hay un umbral
-  // estricto que dispara rápido y otro laxo que garantiza el disparo si llevas
-  // un rato delante de algo nuevo aunque la imagen no se quede clavada.
+  // nueva?). El pulso a mano tiembla más de lo que parecía: si la imagen se
+  // queda clavada dispara al segundo, y si tiembla un poco basta con llevar
+  // DOS segundos seguidos casi quieto delante de algo nuevo. Lo que cuenta es
+  // el tiempo parado ante la planta, no el reloj desde la captura anterior.
   const LADO_MINIATURA = 48;
   const UMBRAL_QUIETO = 0.055;
   const UMBRAL_QUIETO_LAX = 0.09;
   const UMBRAL_ESCENA_NUEVA = 0.1;
   const MARGEN_MS = 3000;
-  const PACIENCIA_MS = 8000;
+  const TICKS_CASI_QUIETO = 2;
   const miniPrevRef = useRef<Uint8ClampedArray | null>(null);
   const miniAnalizadaRef = useRef<Uint8ClampedArray | null>(null);
   const ultimoAnalisisRef = useRef(0);
+  const casiQuietoRef = useRef(0);
 
   const miniatura = (video: HTMLVideoElement): Uint8ClampedArray | null => {
     if (video.videoWidth === 0) return null;
@@ -296,9 +298,13 @@ export default function RecorridoClient({ plantas, parcel, deteccionesIniciales,
       const quieto = movimiento < UMBRAL_QUIETO;
       const casiQuieto = movimiento < UMBRAL_QUIETO_LAX;
       const escenaNueva = !miniAnalizadaRef.current || diferencia(ahora, miniAnalizadaRef.current) > UMBRAL_ESCENA_NUEVA;
-      const desde = Date.now() - ultimoAnalisisRef.current;
+      const conMargen = Date.now() - ultimoAnalisisRef.current > MARGEN_MS;
 
-      if (escenaNueva && desde > MARGEN_MS && (quieto || (casiQuieto && desde > PACIENCIA_MS))) {
+      // Segundos seguidos casi quieto delante de una escena nueva.
+      casiQuietoRef.current = casiQuieto && escenaNueva ? casiQuietoRef.current + 1 : 0;
+
+      if (escenaNueva && conMargen && (quieto || casiQuietoRef.current >= TICKS_CASI_QUIETO)) {
+        casiQuietoRef.current = 0;
         capturar();
         return;
       }
