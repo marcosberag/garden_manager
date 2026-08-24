@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, GeoJSON, Polyline
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { pinDePlanta, svgDePlanta, TAMANO_PIN, ANCLA_PIN } from '@/lib/plant-icons';
+import type { GeoJsonObject } from 'geojson';
 
 // Todas las plantas usan un pin propio (ver más abajo). Se sustituye también el
 // marcador por defecto de Leaflet, que se descargaba de unpkg.com, para no
@@ -38,7 +39,7 @@ const VERDE_APP = '#117025';
 
 interface MapComponentProps {
   plants: Plant[];
-  parcel?: any;
+  parcel?: GeoJsonObject | null;
   onLocationSelect?: (lat: number, lng: number) => void;
   selectingMode?: boolean;
   drawingPath?: [number, number][];
@@ -57,8 +58,8 @@ function LocationPicker({ onSelect }: { onSelect: (lat: number, lng: number) => 
 
 export default function MapComponent({ plants, parcel, onLocationSelect, selectingMode = false, drawingPath, onMoveRequest, onRemoveRequest }: MapComponentProps) {
   // Default center (Spain)
-  const [center, setCenter] = useState<[number, number]>([40.4168, -3.7038]);
-  const [zoom, setZoom] = useState(6);
+  const [center] = useState<[number, number]>([40.4168, -3.7038]);
+  const [zoom] = useState(6);
   const mapRef = useRef<L.Map>(null);
   const [mapReady, setMapReady] = useState(false);
   const hasInitializedGeolocation = useRef(false);

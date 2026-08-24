@@ -1,22 +1,118 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient as createServerClient } from '@/utils/supabase/server';
-import { createClient as createStandardClient } from '@supabase/supabase-js';
+import { createClient as createStandardClient, type SupabaseClient } from '@supabase/supabase-js';
 import { enviarWhatsApp } from '@/lib/callmebot';
 import { parteNocturnoFumigacion, centroDeGeojson } from '@/lib/meteo';
+import { hoyEnEspana } from '@/lib/estado-evento';
 
 export const dynamic = 'force-dynamic';
+
+type EventoCron = {
+  id: string;
+  user_id: string;
+  type: string;
+  date: string;
+  notes: string | null;
+  products: { name: string } | null;
+  plants: { name: string } | null;
+};
+
+type ContactoCron = {
+  user_id: string;
+  phone_number: string | null;
+  api_key: string | null;
+};
+
+/** Día siguiente de una fecha AAAA-MM-DD, sin tocar zonas horarias. */
+function diaSiguiente(fecha: string): string {
+  const [a, m, d] = fecha.split('-').map(Number);
+  const obj = new Date(a, m - 1, d + 1);
+  return `${obj.getFullYear()}-${String(obj.getMonth() + 1).padStart(2, '0')}-${String(obj.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * El mensaje diario de un jardín: qué toca hoy (o va con retraso), qué toca
+ * mañana, y el parte de la noche si hay algo que aplicar. Devuelve null si ese
+ * jardín no tiene nada que contar.
+ */
+async function mensajeDelJardin(
+  supabase: SupabaseClient,
+  jardin: string,
+  eventos: EventoCron[],
+  hoy: string,
+  manana: string,
+): Promise<string | null> {
+  const lineas: string[] = [];
+  // Condición de parada que llevan los avisos en las notas ("Revisar hasta:
+  // mientras haya síntomas."). Si aparece, el mensaje la enseña y pregunta.
+  const revisarDe = (e: EventoCron) => e.notes?.match(/Revisar hasta: (.+?)\.(?:\s|$)/)?.[1] || null;
+  let hayCondiciones = false;
+
+  const cerrado = (e: EventoCron) => e.notes?.includes('[HECHO]') || e.notes?.includes('[FIN]');
+  const pendientes = eventos.filter(e => !cerrado(e) && (e.notes?.includes('[PROGRAMADO]') || e.date >= hoy));
+
+  const deHoy = pendientes.filter(e => e.date <= hoy);
+  const deManana = pendientes.filter(e => e.date === manana);
+
+  const seccion = (titulo: string, lista: EventoCron[]) => {
+    if (lista.length === 0) return;
+    lineas.push(titulo);
+    for (const e of lista) {
+      const producto = e.products?.name || e.type;
+      const planta = e.plants?.name || 'General';
+      const revisar = revisarDe(e);
+      if (revisar) hayCondiciones = true;
+      lineas.push(`- ${producto} en ${planta}${revisar ? ` (hasta: ${revisar})` : ''}`);
+    }
+    lineas.push('');
+  };
+
+  seccion('🚨 *Hoy hay que fumigar:*', deHoy.filter(e => !e.notes?.includes('[POSPUESTO]')));
+  seccion('🚨 *Fumigación pospuesta - Hoy hay que fumigar:*', deHoy.filter(e => e.notes?.includes('[POSPUESTO]')));
+  seccion('⚠️ *Mañana hay que fumigar:*', deManana.filter(e => !e.notes?.includes('[POSPUESTO]')));
+  seccion('⚠️ *Fumigación pospuesta - Mañana hay que fumigar:*', deManana.filter(e => e.notes?.includes('[POSPUESTO]')));
+
+  // El parte de la noche: aquí se fumiga de noche, así que lo que decide es
+  // la lluvia y el viento de esta noche y la madrugada, no el sol de mediodía.
+  if (deHoy.length > 0 || deManana.length > 0) {
+    try {
+      const { data: parcelas } = await supabase.from('parcels').select('geojson').eq('user_id', jardin).limit(1);
+      let coords = centroDeGeojson(parcelas?.[0]?.geojson);
+      if (!coords) {
+        const { data: conPos } = await supabase.from('plants').select('lat, lng').eq('user_id', jardin).not('lat', 'is', null).limit(1);
+        if (conPos?.[0]?.lat != null) coords = { lat: conPos[0].lat, lng: conPos[0].lng };
+      }
+      if (coords) {
+        const parte = await parteNocturnoFumigacion(coords.lat, coords.lng);
+        if (parte) {
+          lineas.push(parte.resumen);
+          lineas.push('');
+        }
+      }
+    } catch (e) {
+      console.error('[cron/whatsapp] Parte meteorológico no disponible:', e);
+    }
+  }
+
+  if (hayCondiciones) {
+    lineas.push('🔎 ¿Siguen los síntomas? Si alguna condición de arriba ya se cumplió, da por terminado ese tratamiento desde la app y dejará de avisar.');
+  }
+
+  if (lineas.length === 0) return null;
+  return `🌿 *Brotes*\n\n${lineas.join('\n')}`.trim();
+}
 
 export async function GET(request: NextRequest) {
   try {
     const serverSupabase = await createServerClient();
     const { data: { user } } = await serverSupabase.auth.getUser();
 
-    let supabase;
+    let supabase: SupabaseClient;
     if (user) {
       // Si el usuario lo ejecuta manualmente desde el navegador, usamos sus cookies
       supabase = serverSupabase;
     } else {
-      // Si lo ejecuta un servidor externo (Cron) a las 8AM, no hay cookies. Necesitamos la clave maestra.
+      // Si lo ejecuta un servidor externo (Cron), no hay cookies. Necesitamos la clave maestra.
       // Como esa clave se salta las RLS, exigimos el CRON_SECRET que Vercel envía
       // automáticamente en la cabecera Authorization al invocar el cron.
       const cronSecret = process.env.CRON_SECRET;
@@ -46,171 +142,69 @@ export async function GET(request: NextRequest) {
       supabase = createStandardClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey);
     }
 
-    const { data: events, error } = await supabase.from('events').select(`
+    const { data, error } = await supabase.from('events').select(`
       id,
+      user_id,
       type,
       date,
       notes,
       products ( name ),
       plants ( name )
     `);
-
     if (error) throw error;
+    const eventos = (data || []) as unknown as EventoCron[];
 
-    const getLocalDateString = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    
-    const todayObj = new Date();
-    todayObj.setHours(0,0,0,0);
-    const todayStr = getLocalDateString(todayObj);
-    
-    const tomorrowObj = new Date(todayObj);
-    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
-    const tomorrowStr = getLocalDateString(tomorrowObj);
+    // La fecha del jardín, no la del servidor: Vercel vive en UTC y en una
+    // ejecución manual de madrugada iría un día por detrás.
+    const hoy = hoyEnEspana();
+    const manana = diaSiguiente(hoy);
 
-    let msgLines: string[] = [];
-    // Condición de parada que llevan los avisos en las notas ("Revisar hasta:
-    // mientras haya síntomas."). Si aparece, el mensaje la enseña y pregunta.
-    const revisarDe = (e: any) => e.notes?.match(/Revisar hasta: (.+?)\.(?:\s|$)/)?.[1] || null;
-    let hayCondiciones = false;
+    // Cada jardín recibe SU mensaje, y solo el suyo. Con la clave maestra el
+    // cron ve las filas de todos los usuarios: mezclarlas en un único mensaje
+    // enviado a todos los contactos era correcto con un solo jardín y un fallo
+    // de privacidad con dos.
+    const { data: contactosData, error: contactsError } = await supabase
+      .from('notification_contacts')
+      .select('user_id, phone_number, api_key');
+    if (contactsError) throw contactsError;
+    const contactos = (contactosData || []) as ContactoCron[];
 
-    // Pending real events in the future (including today)
-    const pendingEvents = events?.filter(e => (!e.notes || !e.notes.includes('[PROGRAMADO]')) && (!e.notes || !e.notes.includes('[HECHO]')) && e.date >= todayStr) || [];
-    // Programmed events
-    const programmedEvents = events?.filter(e => e.notes?.includes('[PROGRAMADO]') && (!e.notes || !e.notes.includes('[HECHO]'))) || [];
+    const jardines = [...new Set(eventos.map(e => e.user_id))];
+    const messagesSent: string[] = [];
+    const sendErrors: string[] = [];
+    let mensajesCompuestos = 0;
 
-    const allPending = [...pendingEvents, ...programmedEvents];
+    for (const jardin of jardines) {
+      const mensaje = await mensajeDelJardin(supabase, jardin, eventos.filter(e => e.user_id === jardin), hoy, manana);
+      if (!mensaje) continue;
+      mensajesCompuestos += 1;
 
-    // Anything <= today is urgent or due today
-    const todayEvents = allPending.filter(e => e.date <= todayStr);
-    const tomorrowEvents = allPending.filter(e => e.date === tomorrowStr);
-
-    if (todayEvents.length > 0) {
-      const normalToday = todayEvents.filter(e => !e.notes?.includes('[POSPUESTO]'));
-      const postponedToday = todayEvents.filter(e => e.notes?.includes('[POSPUESTO]'));
-      
-      if (normalToday.length > 0) {
-        msgLines.push(`🚨 *Hoy hay que fumigar:*`);
-        normalToday.forEach(e => {
-          const product = (e.products as any)?.name || e.type;
-          const plant = (e.plants as any)?.name || 'General';
-          const revisar = revisarDe(e);
-          if (revisar) hayCondiciones = true;
-          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
-        });
-        msgLines.push('');
-      }
-      
-      if (postponedToday.length > 0) {
-        msgLines.push(`🚨 *Fumigación pospuesta - Hoy hay que fumigar:*`);
-        postponedToday.forEach(e => {
-          const product = (e.products as any)?.name || e.type;
-          const plant = (e.plants as any)?.name || 'General';
-          const revisar = revisarDe(e);
-          if (revisar) hayCondiciones = true;
-          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
-        });
-        msgLines.push('');
-      }
-    }
-
-    if (tomorrowEvents.length > 0) {
-      const normalTomorrow = tomorrowEvents.filter(e => !e.notes?.includes('[POSPUESTO]'));
-      const postponedTomorrow = tomorrowEvents.filter(e => e.notes?.includes('[POSPUESTO]'));
-
-      if (normalTomorrow.length > 0) {
-        msgLines.push(`⚠️ *Mañana hay que fumigar:*`);
-        normalTomorrow.forEach(e => {
-          const product = (e.products as any)?.name || e.type;
-          const plant = (e.plants as any)?.name || 'General';
-          const revisar = revisarDe(e);
-          if (revisar) hayCondiciones = true;
-          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
-        });
-        msgLines.push('');
-      }
-      
-      if (postponedTomorrow.length > 0) {
-        msgLines.push(`⚠️ *Fumigación pospuesta - Mañana hay que fumigar:*`);
-        postponedTomorrow.forEach(e => {
-          const product = (e.products as any)?.name || e.type;
-          const plant = (e.plants as any)?.name || 'General';
-          const revisar = revisarDe(e);
-          if (revisar) hayCondiciones = true;
-          msgLines.push(`- ${product} en ${plant}${revisar ? ` (hasta: ${revisar})` : ''}`);
-        });
-        msgLines.push('');
-      }
-    }
-
-    // El parte de la noche: aquí se fumiga de noche, así que lo que decide es
-    // la lluvia y el viento de esta noche y la madrugada, no el sol de mediodía.
-    if (todayEvents.length > 0 || tomorrowEvents.length > 0) {
-      try {
-        const { data: parcelas } = await supabase.from('parcels').select('geojson').limit(1);
-        let coords = centroDeGeojson(parcelas?.[0]?.geojson);
-        if (!coords) {
-          const { data: conPos } = await supabase.from('plants').select('lat, lng').not('lat', 'is', null).limit(1);
-          if (conPos?.[0]?.lat != null) coords = { lat: conPos[0].lat, lng: conPos[0].lng };
-        }
-        if (coords) {
-          const parte = await parteNocturnoFumigacion(coords.lat, coords.lng);
-          if (parte) {
-            msgLines.push(parte.resumen);
-            msgLines.push('');
+      const susContactos = contactos.filter(c => c.user_id === jardin && c.phone_number && c.api_key);
+      for (const contacto of susContactos) {
+        try {
+          const { ok, respuesta } = await enviarWhatsApp(contacto.phone_number!, contacto.api_key!, mensaje);
+          if (ok) {
+            messagesSent.push(contacto.phone_number!);
+          } else {
+            console.error(`Error CallMeBot para ${contacto.phone_number}:`, respuesta);
+            sendErrors.push(`${contacto.phone_number}: ${respuesta}`);
           }
+        } catch (e) {
+          console.error(`Fetch error para ${contacto.phone_number}:`, e);
+          sendErrors.push(`${contacto.phone_number}: ${e instanceof Error ? e.message : 'error de red'}`);
         }
-      } catch (e) {
-        console.error('[cron/whatsapp] Parte meteorológico no disponible:', e);
       }
     }
 
-    if (hayCondiciones) {
-      msgLines.push('🔎 ¿Siguen los síntomas? Si alguna condición de arriba ya se cumplió, da por terminado ese tratamiento desde la app y dejará de avisar.');
-    }
-
-    if (msgLines.length === 0) {
-      return NextResponse.json({ 
+    if (mensajesCompuestos === 0) {
+      return NextResponse.json({
         message: 'No hay notificaciones para hoy o mañana.',
-        debugInfo: {
-          todayStr,
-          tomorrowStr,
-          totalEvents: events?.length || 0,
-          programmedEvents: programmedEvents.length,
-          pendingEvents: pendingEvents.length,
-          todayEvents: todayEvents.length,
-          tomorrowEvents: tomorrowEvents.length,
-          allPendingIds: allPending.map(e => e.id)
-        }
+        debugInfo: { hoy, manana, totalEventos: eventos.length, jardines: jardines.length },
       });
     }
 
-    const finalMessage = `🌿 *Garden Manager*\n\n${msgLines.join('\n')}`.trim();
-
-    // Obtener los contactos de notificación de la base de datos
-    const { data: contacts, error: contactsError } = await supabase.from('notification_contacts').select('phone_number, api_key');
-    if (contactsError) throw contactsError;
-
-    if (!contacts || contacts.length === 0) {
+    if (contactos.length === 0) {
       return NextResponse.json({ message: 'No hay contactos de WhatsApp configurados en Ajustes.' });
-    }
-
-    const messagesSent = [];
-    const sendErrors = [];
-    for (const contact of contacts) {
-      if (contact.phone_number && contact.api_key) {
-        try {
-          const { ok, respuesta } = await enviarWhatsApp(contact.phone_number, contact.api_key, finalMessage);
-          if (ok) {
-            messagesSent.push(contact.phone_number);
-          } else {
-            console.error(`Error CallMeBot para ${contact.phone_number}:`, respuesta);
-            sendErrors.push(`${contact.phone_number}: ${respuesta}`);
-          }
-        } catch (e: any) {
-          console.error(`Fetch error para ${contact.phone_number}:`, e);
-          sendErrors.push(`${contact.phone_number}: ${e.message}`);
-        }
-      }
     }
 
     // Si había que avisar y no salió ni un mensaje, el cron tiene que fallar de
@@ -221,8 +215,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, messagesSent, sendErrors });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error al enviar WhatsApp:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Error inesperado' }, { status: 500 });
   }
 }

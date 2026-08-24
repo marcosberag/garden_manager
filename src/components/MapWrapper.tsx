@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import type { GeoJsonObject } from 'geojson';
 import { setPlantLocation, saveUserParcel, removePlantLocation, setPlantPath } from '@/app/actions';
 
 const MapComponent = dynamic(
@@ -32,19 +33,26 @@ interface Plant {
   path?: [number, number][];
 }
 
-export default function MapWrapper({ plants, initialParcel }: { plants: Plant[], initialParcel: any }) {
+type SugerenciaDireccion = { name: string; display_name: string; lat: number; lon: number };
+
+type RasgoPhoton = {
+  properties: { name: string; countrycode?: string; country?: string; city?: string; state?: string };
+  geometry: { coordinates: [number, number] };
+};
+
+export default function MapWrapper({ plants, initialParcel }: { plants: Plant[], initialParcel: GeoJsonObject | null }) {
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [placementType, setPlacementType] = useState<'point' | 'line'>('point');
   const [drawingPath, setDrawingPath] = useState<[number, number][]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [parcel, setParcel] = useState<any>(initialParcel);
+  const [parcel, setParcel] = useState<GeoJsonObject | null>(initialParcel);
   
   const [ciudad, setCiudad] = useState('');
   const [calle, setCalle] = useState('');
   const [numero, setNumero] = useState('');
   
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SugerenciaDireccion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [focusedInput, setFocusedInput] = useState<'ciudad' | 'calle' | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -66,13 +74,11 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
   // Plantas sin ubicación
   const unplacedPlants = plants.filter(p => (!p.lat || !p.lng) && (!p.path || p.path.length === 0));
 
-  // Auto-completado mientras escribe
+  // Auto-completado mientras escribe. Vaciar las sugerencias cuando el texto
+  // se queda corto ocurre en los onChange, no aquí: React desaconseja tocar
+  // estado en el cuerpo de un efecto.
   useEffect(() => {
-    if (ciudad.length < 3 && calle.length < 3) {
-      setSearchResults([]);
-      setShowSuggestions(false);
-      return;
-    }
+    if (ciudad.length < 3 && calle.length < 3) return;
 
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
@@ -98,12 +104,12 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
         
         if (data && data.features && data.features.length > 0) {
           // Filtrar resultados a España
-          let features = data.features.filter((f: any) => f.properties.countrycode === 'ES' || f.properties.country === 'España' || f.properties.country === 'Spain');
+          let features = (data.features as RasgoPhoton[]).filter(f => f.properties.countrycode === 'ES' || f.properties.country === 'España' || f.properties.country === 'Spain');
           
           if (focusedInput === 'ciudad') {
             // Quitar duplicados por nombre
-            const unique = [];
-            const seen = new Set();
+            const unique: RasgoPhoton[] = [];
+            const seen = new Set<string>();
             for (const f of features) {
               if (!seen.has(f.properties.name)) {
                 seen.add(f.properties.name);
@@ -113,7 +119,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
             features = unique;
           }
 
-          const mapped = features.map((f: any) => ({
+          const mapped: SugerenciaDireccion[] = features.map(f => ({
             name: f.properties.name,
             display_name: `${f.properties.name}${f.properties.city && f.properties.city !== f.properties.name ? ', ' + f.properties.city : ''}${f.properties.state ? ', ' + f.properties.state : ''}`,
             lat: f.geometry.coordinates[1],
@@ -136,7 +142,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [calle, ciudad]);
+  }, [calle, ciudad, focusedInput]);
 
   const handleLocationSelect = async (lat: number, lng: number) => {
     if (!selectedPlantId) {
@@ -152,8 +158,8 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
     try {
       await setPlantLocation(selectedPlantId, lat, lng);
       setSelectedPlantId(null);
-    } catch (err: any) {
-      setModal({ type: 'alert', message: `Error al guardar la ubicación: ${err.message}`, onConfirm: () => setModal(null) });
+    } catch (err) {
+      setModal({ type: 'alert', message: `Error al guardar la ubicación: ${err instanceof Error ? err.message : 'desconocido'}`, onConfirm: () => setModal(null) });
     } finally {
       setIsSaving(false);
     }
@@ -163,8 +169,8 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
     setIsSaving(true);
     try {
       await removePlantLocation(plantId);
-    } catch (err: any) {
-      setModal({ type: 'alert', message: `Error al quitar del mapa: ${err.message}`, onConfirm: () => setModal(null) });
+    } catch (err) {
+      setModal({ type: 'alert', message: `Error al quitar del mapa: ${err instanceof Error ? err.message : 'desconocido'}`, onConfirm: () => setModal(null) });
     } finally {
       setIsSaving(false);
     }
@@ -183,8 +189,8 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
       setSelectedPlantId(null);
       setDrawingPath([]);
       setPlacementType('point');
-    } catch (err: any) {
-      setModal({ type: 'alert', message: `Error al guardar la línea: ${err.message}`, onConfirm: () => setModal(null) });
+    } catch (err) {
+      setModal({ type: 'alert', message: `Error al guardar la línea: ${err instanceof Error ? err.message : 'desconocido'}`, onConfirm: () => setModal(null) });
     } finally {
       setIsSaving(false);
     }
@@ -227,9 +233,9 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
       setParcel(parcelGeojson);
       setSearchResults([]);
       
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setModal({ type: 'alert', message: err.message || "Error al extraer la parcela", onConfirm: () => setModal(null) });
+      setModal({ type: 'alert', message: err instanceof Error ? err.message : 'Error al extraer la parcela', onConfirm: () => setModal(null) });
     } finally {
       setIsSearching(false);
     }
@@ -254,7 +260,7 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
       try {
         const jsonStr = cartoText.replace(/^callback\(/, '').replace(/\)$/, '');
         cartoData = JSON.parse(jsonStr);
-      } catch (e) {}
+      } catch { /* la respuesta JSONP no siempre trae el envoltorio */ }
 
       if (!cartoData || cartoData.state === -1 || (!cartoData.lat && !cartoData.lng && !cartoData.refCatastral)) {
         setModal({
@@ -271,9 +277,9 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
       const refcat = cartoData.refCatastral;
       await executeCatastroExtraction(lat, lon, refcat);
       
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setModal({ type: 'alert', message: err.message || "Error al realizar la búsqueda.", onConfirm: () => setModal(null) });
+      setModal({ type: 'alert', message: err instanceof Error ? err.message : 'Error al realizar la búsqueda.', onConfirm: () => setModal(null) });
       setIsSearching(false);
     }
   };
@@ -372,7 +378,13 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                 ref={ciudadRef}
                 type="text" 
                 value={ciudad}
-                onChange={(e) => setCiudad(e.target.value)}
+                onChange={(e) => {
+                  setCiudad(e.target.value);
+                  if (e.target.value.length < 3 && calle.length < 3) {
+                    setSearchResults([]);
+                    setShowSuggestions(false);
+                  }
+                }}
                 onFocus={() => {
                   if (focusedInput !== 'ciudad') {
                     setSearchResults([]);
@@ -428,7 +440,13 @@ export default function MapWrapper({ plants, initialParcel }: { plants: Plant[],
                 ref={calleRef}
                 type="text" 
                 value={calle}
-                onChange={(e) => setCalle(e.target.value)}
+                onChange={(e) => {
+                  setCalle(e.target.value);
+                  if (e.target.value.length < 3 && ciudad.length < 3) {
+                    setSearchResults([]);
+                    setShowSuggestions(false);
+                  }
+                }}
                 onFocus={() => {
                   if (focusedInput !== 'calle') {
                     setSearchResults([]);

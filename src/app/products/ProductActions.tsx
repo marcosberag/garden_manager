@@ -12,7 +12,7 @@ export default function ProductActions({ id }: { id: string }) {
     setIsDeleting(true);
     try {
       await deleteProduct(id);
-    } catch (err) {
+    } catch {
       alert('Error al eliminar el producto.');
       setIsDeleting(false);
       setShowConfirm(false);

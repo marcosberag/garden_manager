@@ -1,7 +1,14 @@
 import { XMLParser } from 'fast-xml-parser';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(req: Request) {
   try {
+    // Con sesión: la ruta hace de proxy contra el Catastro y no tiene por qué
+    // estar abierta a cualquiera que conozca la URL.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
+
     const { searchParams } = new URL(req.url);
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
@@ -64,7 +71,7 @@ export async function GET(req: Request) {
       if (typeof posListStr === 'object' && posListStr['#text']) {
         posListStr = posListStr['#text'];
       }
-    } catch (e) {
+    } catch {
       // Try alternative paths if XML structure varies slightly (which it often does in GML)
       const matches = wfsXml.match(/<gml:posList[^>]*>([\s\S]*?)<\/gml:posList>/);
       if (matches && matches[1]) {
@@ -98,8 +105,8 @@ export async function GET(req: Request) {
     };
 
     return Response.json(geojson);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in parcel extraction:', error);
-    return Response.json({ error: error.message || 'Error processing parcel' }, { status: 500 });
+    return Response.json({ error: error instanceof Error ? error.message : 'Error processing parcel' }, { status: 500 });
   }
 }

@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { addPlant, updatePlant } from '@/app/actions';
 import AutocompleteInput from '@/components/AutocompleteInput';
@@ -20,11 +19,6 @@ interface PlantData {
 
 export default function PlantFormClient({ initialData, isEdit = false }: { initialData?: PlantData, isEdit?: boolean }) {
   const router = useRouter();
-  const [speciesValue, setSpeciesValue] = useState(initialData?.species || '');
-
-  const handleIdentified = (species: string) => {
-    setSpeciesValue(species);
-  };
 
   const formAction = isEdit && initialData?.id 
     ? updatePlant.bind(null, initialData.id) 
@@ -56,8 +50,7 @@ export default function PlantFormClient({ initialData, isEdit = false }: { initi
             name="species" 
             required 
             placeholder="Ej: Monstera Deliciosa, Palmera Phoenix..."
-            defaultValue={speciesValue}
-            key={speciesValue} // Force re-render when AI updates the value
+            defaultValue={initialData?.species || ''}
           />
         </div>
 

@@ -112,7 +112,7 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
             
             {futureEvents.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {futureEvents.map((rec: any, idx: number) => {
+                {futureEvents.map((rec: { date: string; type: string; notes?: string | null; frequency_days?: number | null; products?: { name: string } | null }, idx: number) => {
                   const isUrgent = rec.date <= todayStr;
                   return (
                     <div key={idx} style={{
@@ -147,7 +147,7 @@ export default async function PlantDetailPage({ params }: { params: Promise<{ id
                     <span style={{ fontSize: '13px', color: 'var(--color-graphite)' }}>{event.date}</span>
                   </div>
                   {event.notes && (
-                    <p style={{ fontSize: '12px', margin: 0, color: 'var(--color-graphite)' }}>"{event.notes}"</p>
+                    <p style={{ fontSize: '12px', margin: 0, color: 'var(--color-graphite)' }}>«{event.notes}»</p>
                   )}
                 </div>
               ))}

@@ -12,7 +12,7 @@ export default function PlantActions({ id }: { id: string }) {
     setIsDeleting(true);
     try {
       await deletePlant(id);
-    } catch (err) {
+    } catch {
       alert('Error al eliminar la planta.');
       setIsDeleting(false);
       setShowConfirm(false);

@@ -46,13 +46,30 @@ type Defaults = {
   notas?: string;
 };
 
-export default function NewEventForm({ plants, products, today, defaults }: { plants: any[], products: any[], today: string, defaults?: Defaults }) {
+type PlantaForm = {
+  id: string;
+  name: string;
+  species?: string | null;
+  path?: [number, number][] | null;
+  size?: string | null;
+};
+
+type ProductoForm = {
+  id: string;
+  name: string;
+  type?: string | null;
+  description?: string | null;
+  dosage?: string | null;
+  frequency_days?: number | null;
+};
+
+export default function NewEventForm({ plants, products, today, defaults }: { plants: PlantaForm[], products: ProductoForm[], today: string, defaults?: Defaults }) {
   const [dates, setDates] = useState<string[]>([today]);
   const [loading, setLoading] = useState(false);
 
   // Copia local del inventario: el escáner puede dar de alta un producto nuevo
   // y hay que poder seleccionarlo sin recargar la página.
-  const [inventario, setInventario] = useState<any[]>(products || []);
+  const [inventario, setInventario] = useState<ProductoForm[]>(products || []);
   // Los valores iniciales llegan por URL desde la ficha de la planta o desde el
   // diagnóstico por foto, que encadena aquí con todo pre-rellenado.
   const [productoId, setProductoId] = useState(defaults?.productId || '');
@@ -73,7 +90,7 @@ export default function NewEventForm({ plants, products, today, defaults }: { pl
 
   const productoElegido = inventario.find(p => p.id === productoId) || null;
 
-  const elegirProducto = (producto: any | null) => {
+  const elegirProducto = (producto: ProductoForm | null) => {
     setProductoId(producto?.id || '');
     frecuenciaTocada.current = false;
     setSugerencia(null);
@@ -148,14 +165,15 @@ export default function NewEventForm({ plants, products, today, defaults }: { pl
       dosage: identificado.dosage,
     });
 
-    if (!resultado.product) {
+    const creado = resultado.product;
+    if (!creado) {
       setAvisoEscaner(resultado.error || 'No se pudo guardar el producto identificado.');
       return;
     }
 
-    setInventario(prev => [...prev, resultado.product]);
-    elegirProducto(resultado.product);
-    setAvisoEscaner(`Identificado: ${resultado.product.name}. Añadido a tu inventario.`);
+    setInventario(prev => [...prev, creado]);
+    elegirProducto(creado);
+    setAvisoEscaner(`Identificado: ${creado.name}. Añadido a tu inventario.`);
   };
 
   const handleAddDate = () => setDates([...dates, today]);

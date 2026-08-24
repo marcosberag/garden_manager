@@ -10,6 +10,25 @@ import { centroDeGeojson } from '@/lib/meteo';
 import { generarPlanAnual, type PropuestaPlan } from '@/lib/plan-anual';
 import { interpretarPeticion, type EnlaceAsistente } from '@/lib/asistente';
 import { aplicacionesDeLaTanda, cortePorInactividad } from '@/lib/tandas';
+import { enviarWhatsApp } from '@/lib/callmebot';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+/**
+ * Forma mínima de una fila de events tal como se maneja en este módulo. El
+ * cliente de Supabase no está tipado contra el esquema, así que esto documenta
+ * lo que las funciones usan de verdad.
+ */
+type EventoFila = {
+  id: string;
+  type: string;
+  date: string;
+  notes: string | null;
+  plant_id: string | null;
+  product_id: string | null;
+  frequency_days?: number | null;
+  products?: { name: string; type?: string | null; description?: string | null; frequency_days?: number | null } | null;
+  plants?: { name: string; species?: string | null } | null;
+};
 import { jardinDe } from '@/lib/jardin';
 
 /**
@@ -195,7 +214,7 @@ export async function updatePlant(id: string, formData: FormData) {
 
   if (!name) throw new Error('La especie o el nombre de la planta es obligatorio');
 
-  const updateData: any = {
+  const updateData: Record<string, unknown> = {
     name, species, description, location, size, age,
     icon_emoji: icon_emoji || null,
     icon_category: await resolverCategoria(species, name),
@@ -404,7 +423,7 @@ export async function addEvent(formData: FormData) {
     throw new Error('Tipo y fecha son obligatorios');
   }
 
-  let futureEventsToInsert: any[] = [];
+  const futureEventsToInsert: { user_id: string; type: string; date: string; notes: string; frequency_days: number; plant_id: string | null; product_id: string | null }[] = [];
 
   if (frequency_days > 0) {
     // Limpiar eventos programados antiguos para esta misma tarea
@@ -682,13 +701,7 @@ export async function postponeEvent(id: string) {
   // Recuperamos el evento completo para saber qué se ha pospuesto
   const { data: event, error: fetchError } = await supabase
     .from('events')
-    .select(`
-      type, 
-      date,
-      notes, 
-      plants(name), 
-      products(name)
-    `)
+    .select('type, date, notes, plants(name), products(name)')
     .eq('id', id)
     .single();
     
@@ -721,23 +734,18 @@ export async function postponeEvent(id: string) {
     throw new Error('Error al posponer el evento en la base de datos');
   }
 
-  // ENVIAR NOTIFICACIÓN INMEDIATA POR CALLMEBOT
-  const productName = (event.products as any)?.name || event.type;
-  const plantName = (event.plants as any)?.name || 'General';
+  // Aviso inmediato por WhatsApp de que la tarea se ha aplazado.
+  const productName = (event.products as unknown as { name: string } | null)?.name || event.type;
+  const plantName = (event.plants as unknown as { name: string } | null)?.name || 'General';
   const alertText = `🕒 *Pospuesto a mañana:*\nSe ha aplazado la tarea de ${productName} en ${plantName}.`;
   
   const { data: contacts } = await supabase.from('notification_contacts').select('phone_number, api_key').eq('user_id', jardin.id);
   
-  if (contacts && contacts.length > 0) {
-    for (const contact of contacts) {
-      if (contact.phone_number && contact.api_key) {
-        const text = encodeURIComponent(alertText);
-        const cleanPhone = contact.phone_number.replace(/\D/g, '');
-        const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${text}&apikey=${contact.api_key}`;
-        
-        // Lo disparamos sin esperar a que termine (en background) para no ralentizar la interfaz
-        fetch(url).catch(e => console.error("Error enviando aviso de posponer:", e));
-      }
+  for (const contact of contacts || []) {
+    if (contact.phone_number && contact.api_key) {
+      // Sin esperar a que termine, para no retener la interfaz.
+      enviarWhatsApp(contact.phone_number, contact.api_key, alertText)
+        .catch(e => console.error('Error enviando aviso de posponer:', e));
     }
   }
 
@@ -791,7 +799,7 @@ export async function completeEvent(id: string) {
       await deleteQuery;
       
       // 2. Crear los 3 próximos eventos calculados desde HOY
-      let nextDate = new Date(todayObj);
+      const nextDate = new Date(todayObj);
       nextDate.setDate(nextDate.getDate() + frequency_days);
       
       // Cuántas quedan antes del límite del producto. Se cuenta DESPUÉS de
@@ -850,7 +858,7 @@ export async function addProductFromScan(identificado: {
   description?: string | null;
   frequency_days?: number | null;
   dosage?: string | null;
-}): Promise<{ product?: any; error?: string }> {
+}): Promise<{ product?: { id: string; name: string; type: string | null; description: string | null; dosage: string | null; frequency_days: number | null }; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -908,7 +916,7 @@ export type CupoAplicaciones = { limite: number; periodo: string; hechas: number
  * de cero, porque eso ya es una tanda nueva.
  */
 async function cupoDeAplicaciones(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string,
   tarea: ClaveTarea,
 ): Promise<CupoAplicaciones | null> {
@@ -945,8 +953,8 @@ async function cupoDeAplicaciones(
     // mano, o se marcó como hecha.
     const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
     const reales = (todos || [])
-      .filter((e: any) => !e.notes?.includes('[PROGRAMADO]') && e.date <= hoy)
-      .map((e: any) => e.date as string);
+      .filter((e: { notes: string | null; date: string }) => !e.notes?.includes('[PROGRAMADO]') && e.date <= hoy)
+      .map((e: { date: string }) => e.date);
 
     const hechas = aplicacionesDeLaTanda(reales, hoy, corte, periodo);
     return { limite, periodo, hechas, restantes: Math.max(0, limite - hechas) };
@@ -960,7 +968,7 @@ async function cupoDeAplicaciones(
  * real con [FIN] y deja dicho por qué. Sin esto el tratamiento se quedaría sin
  * avisos y sin explicación, que es justo como se pierden las cosas de vista.
  */
-async function cerrarPorLimite(supabase: any, userId: string, tarea: ClaveTarea, cupo: CupoAplicaciones) {
+async function cerrarPorLimite(supabase: SupabaseClient, userId: string, tarea: ClaveTarea, cupo: CupoAplicaciones) {
   let consulta = supabase
     .from('events')
     .select('id, notes')
@@ -972,7 +980,7 @@ async function cerrarPorLimite(supabase: any, userId: string, tarea: ClaveTarea,
   consulta = tarea.plant_id ? consulta.eq('plant_id', tarea.plant_id) : consulta.is('plant_id', null);
 
   const { data: todos } = await consulta;
-  const ultima = (todos || []).find((e: any) => !e.notes?.includes('[PROGRAMADO]'));
+  const ultima = (todos || []).find((e: { notes: string | null }) => !e.notes?.includes('[PROGRAMADO]'));
   if (!ultima || ultima.notes?.includes('[FIN]')) return;
 
   const cierre = cupo.periodo === 'total'
@@ -985,16 +993,16 @@ async function cerrarPorLimite(supabase: any, userId: string, tarea: ClaveTarea,
     .match({ id: ultima.id, user_id: userId });
 }
 
-function claveDeTarea(e: any): string {
+function claveDeTarea(e: { type: string; plant_id?: string | null; product_id?: string | null }): string {
   return `${e.type}|${e.plant_id || ''}|${e.product_id || ''}`;
 }
 
-function esMismaTarea(a: any, b: any): boolean {
+function esMismaTarea(a: { type: string; plant_id?: string | null; product_id?: string | null }, b: { type: string; plant_id?: string | null; product_id?: string | null }): boolean {
   return claveDeTarea(a) === claveDeTarea(b);
 }
 
-function agrupaPorTarea(programados: any[]): any[][] {
-  const grupos = new Map<string, any[]>();
+function agrupaPorTarea(programados: EventoFila[]): EventoFila[][] {
+  const grupos = new Map<string, EventoFila[]>();
   for (const e of programados) {
     const clave = claveDeTarea(e);
     grupos.set(clave, [...(grupos.get(clave) || []), e]);
@@ -1018,11 +1026,11 @@ function hastaDeLasNotas(notes?: string | null): string | null {
  * nunca la hubo, conserva la próxima cita y solo reespacia las siguientes.
  */
 async function reprogramarTarea(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string,
-  tarea: any,
+  tarea: EventoFila,
   idsABorrar: string[],
-  todos: any[],
+  todos: EventoFila[],
   dias: number,
   metodo: string | null,
   hasta: string | null,
@@ -1085,19 +1093,19 @@ async function reprogramarTarea(
  * Al cambiar la pauta de un producto, sus avisos programados se reprograman
  * solos con la nueva frecuencia, sin pasos extra.
  */
-async function propagarFrecuenciaDeProducto(supabase: any, userId: string, productId: string, dias: number) {
+async function propagarFrecuenciaDeProducto(supabase: SupabaseClient, userId: string, productId: string, dias: number) {
   const { data: events } = await supabase
     .from('events')
     .select('id, type, date, notes, frequency_days, plant_id, product_id')
     .order('date', { ascending: true });
   if (!events) return;
 
-  const programados = events.filter((e: any) =>
+  const programados = (events as unknown as EventoFila[]).filter(e =>
     e.product_id === productId && e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'));
 
   for (const grupo of agrupaPorTarea(programados)) {
     if (leerFrecuencia(grupo[0]) === dias) continue;
-    await reprogramarTarea(supabase, userId, grupo[0], grupo.map((g: any) => g.id), events, dias, metodoDeLasNotas(grupo[0].notes), hastaDeLasNotas(grupo[0].notes));
+    await reprogramarTarea(supabase, userId, grupo[0], grupo.map(g => g.id), events, dias, metodoDeLasNotas(grupo[0].notes), hastaDeLasNotas(grupo[0].notes));
   }
 }
 
@@ -1125,15 +1133,18 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
 
   const jardin = await jardinDe(supabase, user);
 
-  const { data: events, error } = await supabase
+  const { data: eventsData, error } = await supabase
     .from('events')
     .select('id, type, date, notes, frequency_days, plant_id, product_id, products(name, type, description, frequency_days), plants(name, species)')
     .order('date', { ascending: true });
 
-  if (error || !events) {
+  if (error || !eventsData) {
     console.error('Error leyendo los eventos para recalcular pautas:', error);
     return { error: 'No se pudieron leer los eventos' };
   }
+  // El generador de tipos de Supabase ve los joins a-uno como arrays; aquí
+  // llegan como objeto. Se fija en esta frontera y el resto queda tipado.
+  const events = eventsData as unknown as EventoFila[];
 
   const programados = events.filter(e =>
     e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]') &&
@@ -1146,9 +1157,9 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
   let sinProducto = 0;
 
   for (const grupo of agrupaPorTarea(programados)) {
-    const muestra: any = grupo[0];
-    const producto: any = muestra.products;
-    const planta: any = muestra.plants;
+    const muestra = grupo[0];
+    const producto = muestra.products ?? null;
+    const planta = muestra.plants ?? null;
 
     if (!producto?.name) {
       sinProducto += 1;
@@ -1171,7 +1182,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
       continue;
     }
 
-    if (await reprogramarTarea(supabase, jardin.id, muestra, grupo.map((g: any) => g.id), events, ahora, metodo, pauta.hasta ?? hastaDeLasNotas(muestra.notes))) {
+    if (await reprogramarTarea(supabase, jardin.id, muestra, grupo.map(g => g.id), events, ahora, metodo, pauta.hasta ?? hastaDeLasNotas(muestra.notes))) {
       cambios.push({ tarea, antes, ahora, motivo: pauta.motivo, hasta: pauta.hasta });
     }
   }
@@ -1179,7 +1190,7 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
   // Tareas apagadas: la última aplicación real de cada tarea con producto,
   // para resucitar las que no tengan ya ningún aviso pendiente.
   const clavesPendientes = new Set(programados.map(claveDeTarea));
-  const ultimaRealPorTarea = new Map<string, any>();
+  const ultimaRealPorTarea = new Map<string, EventoFila>();
   for (const e of events) {
     if (e.notes?.includes('[PROGRAMADO]')) continue;
     if (!e.product_id) continue;
@@ -1192,11 +1203,11 @@ export async function recalcularPautasProgramadas(productId?: string): Promise<{
     // [FIN] marca un tratamiento dado por terminado a propósito: no se
     // resucita hasta que el usuario vuelva a registrarlo.
     if (ultimo.notes?.includes('[FIN]')) continue;
-    const producto: any = ultimo.products;
-    const planta: any = ultimo.plants;
+    const producto = ultimo.products ?? null;
+    const planta = ultimo.plants ?? null;
     if (!producto?.name) continue;
     // Un sustrato o una herramienta no se aplican cada X días.
-    if (['Sustrato', 'Herramienta'].includes(producto.type)) continue;
+    if (producto.type && ['Sustrato', 'Herramienta'].includes(producto.type)) continue;
 
     const metodo = metodoDeLasNotas(ultimo.notes);
     const pauta = await frecuenciaSegunCaso({
@@ -1363,7 +1374,7 @@ export async function guardarRecorrido(detecciones: {
           errores.push(`${nombre}: la planta registrada a la que apuntaba ya no existe.`);
           continue;
         }
-        const cambios: any = {};
+        const cambios: Record<string, unknown> = {};
         // La captura se sube siempre: alimenta el historial de evolución.
         const urlFoto = d.foto ? await subirFoto(d.foto) : null;
         // La foto de portada se sustituye solo si falta o si el usuario lo pidió.
@@ -1447,17 +1458,17 @@ export async function prepararPlanAnual(indicaciones: string): Promise<{ propues
     .order('date', { ascending: false })
     .limit(120);
 
-  const linea = (e: any) => {
-    const producto = (e.products as any)?.name || e.type;
-    const planta = (e.plants as any)?.name;
+  const linea = (e: EventoFila) => {
+    const producto = e.products?.name || e.type;
+    const planta = e.plants?.name;
     const nota = e.notes ? ` — ${e.notes.replace(/\[[A-Z]+\]/g, '').trim().slice(0, 80)}` : '';
     return `- ${e.date}: ${producto}${planta ? ` en ${planta}` : ''}${nota}`;
   };
-  const reales = (events || []).filter((e: any) => !e.notes?.includes('[PROGRAMADO]')).slice(0, 40);
-  const programados = (events || []).filter((e: any) => e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')).slice(0, 30);
+  const reales = ((events || []) as unknown as EventoFila[]).filter(e => !e.notes?.includes('[PROGRAMADO]')).slice(0, 40);
+  const programados = ((events || []) as unknown as EventoFila[]).filter(e => e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')).slice(0, 30);
 
   const { data: parcelas } = await supabase.from('parcels').select('geojson').eq('user_id', jardin.id).limit(1);
-  const conPos: any = (plants || []).find((p: any) => p.lat != null && p.lng != null);
+  const conPos = (plants || []).find((p: { lat: number | null; lng: number | null }) => p.lat != null && p.lng != null);
   const coordenadas = centroDeGeojson(parcelas?.[0]?.geojson)
     || (conPos ? { lat: conPos.lat, lng: conPos.lng } : null);
 
@@ -1467,8 +1478,8 @@ export async function prepararPlanAnual(indicaciones: string): Promise<{ propues
   const propuestas = await generarPlanAnual({
     hoy,
     coordenadas,
-    plantas: (plants || []).map((p: any) => ({ nombre: p.name, especie: p.species })),
-    inventario: (products || []).map((p: any) => ({ nombre: p.name, tipo: p.type, descripcion: p.description })),
+    plantas: (plants || []).map((p: { name: string; species: string | null }) => ({ nombre: p.name, especie: p.species })),
+    inventario: (products || []).map((p: { name: string; type: string; description: string | null }) => ({ nombre: p.name, tipo: p.type, descripcion: p.description })),
     historial: reales.map(linea),
     programado: programados.map(linea),
     indicaciones: indicaciones?.slice(0, 600) || null,

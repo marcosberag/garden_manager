@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -8,12 +7,29 @@ interface Event {
   id: string;
   type: string;
   date: string;
-  notes?: string;
-  plant_id?: string;
-  product_id?: string;
-  plants?: { name: string, species: string };
-  products?: { name: string };
+  notes?: string | null;
+  plant_id?: string | null;
+  product_id?: string | null;
+  frequency_days?: number | null;
+  plants?: { name: string; species?: string | null } | null;
+  products?: { name: string } | null;
 }
+
+/** Fila ya preparada para pintar en la lista. */
+type ItemLista = {
+  id: string;
+  type: string;
+  plant_id?: string | null;
+  product_id?: string | null;
+  plant_name: string;
+  product_name: string;
+  reason: string;
+  frequency_days?: number | null;
+  date: string;
+  urgency: 'alta' | 'media' | 'baja';
+  isPast: boolean;
+  isSuggestion: boolean;
+};
 
 interface CalendarViewToggleProps {
   events: Event[];
@@ -32,7 +48,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
   // Funciones de utilidad para el Grid
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => {
-    let day = new Date(year, month, 1).getDay();
+    const day = new Date(year, month, 1).getDay();
     return day === 0 ? 6 : day - 1; // Lunes = 0, Domingo = 6
   };
 
@@ -193,7 +209,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
     return { texto, dias, metodo, hasta, pospuesto, hecho, fin };
   };
 
-  const tituloDe = (item) => {
+  const tituloDe = (item: ItemLista) => {
     const actionName = item.product_name ? item.product_name : item.type;
     if (item.plant_name && item.plant_name !== 'General') {
       return `${actionName} en ${item.plant_name}`;
@@ -208,10 +224,10 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
   } as const;
 
   const renderList = () => {
-    const combinedList = [
+    const combinedList: ItemLista[] = [
       // El estado sale del mismo sitio que usa la rejilla, para que las dos
       // vistas no puedan contradecirse.
-      ...events.map(e => {
+      ...events.map((e): ItemLista => {
         const estado = estadoDe(e);
         return {
           id: e.id,
@@ -225,7 +241,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
           date: e.date,
           urgency: estado === 'atrasado' ? 'alta' : (estado === 'hoy' ? 'media' : 'baja'),
           isPast: estado === 'hecho',
-          isSuggestion: e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]'),
+          isSuggestion: Boolean(e.notes?.includes('[PROGRAMADO]') && !e.notes?.includes('[HECHO]')),
         };
       })
     ];
@@ -258,7 +274,7 @@ export default function CalendarViewToggle({ events }: CalendarViewToggleProps) 
     const atrasados = pendientes.filter(i => i.urgency === 'alta');
     const proximos = pendientes.filter(i => i.urgency !== 'alta');
 
-    const tarjeta = (item, idx) => {
+    const tarjeta = (item: ItemLista, idx: number) => {
           const isUrgent = item.urgency === 'alta';
           const isToday = item.urgency === 'media';
           const info = parseReason(item.reason, item.frequency_days);

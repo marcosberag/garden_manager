@@ -22,8 +22,8 @@ export default function RunCronButton() {
       } else {
         setResult(`❌ Error: ${data.error || data.message || 'Desconocido'}`);
       }
-    } catch (err: any) {
-      setResult(`❌ Error de red: ${err.message}`);
+    } catch (err) {
+      setResult(`❌ Error de red: ${err instanceof Error ? err.message : 'desconocido'}`);
     } finally {
       setIsLoading(false);
     }

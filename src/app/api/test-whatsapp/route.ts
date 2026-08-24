@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/utils/supabase/server';
 import { enviarWhatsApp } from '@/lib/callmebot';
 
 export async function POST(request: Request) {
   try {
+    // Solo con sesión: sin esta guarda la ruta era un relé abierto de CallMeBot.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+
     const { phone, apikey } = await request.json();
 
     if (!phone || !apikey) {
@@ -19,8 +25,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, respuesta });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error enviando WhatsApp:', error);
-    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Error interno' }, { status: 500 });
   }
 }

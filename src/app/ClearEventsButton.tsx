@@ -12,7 +12,7 @@ export default function ClearEventsButton() {
     setShowConfirm(false);
     try {
       await deleteAllEvents();
-    } catch (e) {
+    } catch {
       setLoading(false);
     }
   };

@@ -8,7 +8,9 @@ export async function addContact(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'No autorizado' }
+  // Un <form action> de servidor no puede devolver valores: si no hay
+  // sesión, simplemente no se guarda nada.
+  if (!user) return
 
   const jardin = await jardinDe(supabase, user)
 
